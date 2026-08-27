@@ -1,0 +1,2310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulse PM Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#151A21; --slate:#232B35; --steel:#5A6675; --mute:#8A94A2;
+  --line:#D7DDE4; --hair:#E7EBF0; --surface:#EEF1F5; --paper:#FFFFFF;
+  --flame:#C8102E; --navy:#0B5AA8; --tape:#F2C230; --moss:#2E7D4F;
+  --disp:"Barlow Condensed", "Arial Narrow", sans-serif;
+  --body:"IBM Plex Sans", -apple-system, Segoe UI, Roboto, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --r:3px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--surface);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:var(--disp);font-weight:700;letter-spacing:.01em;margin:0;text-transform:uppercase}
+h1{font-size:30px;line-height:1.05}
+h2{font-size:21px;line-height:1.1}
+h3{font-size:16px;line-height:1.15}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+a{color:var(--navy)}
+button{font-family:var(--body);cursor:pointer}
+:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+
+/* ---------- shell ---------- */
+.app{display:flex;min-height:100vh}
+.rail{width:196px;flex:0 0 196px;background:var(--ink);color:#fff;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+.brand{padding:18px 16px 14px;border-bottom:1px solid #2A323C}
+.brand .mk{font-family:var(--disp);font-size:20px;letter-spacing:.06em;text-transform:uppercase;line-height:1}
+.brand .mk b{color:var(--flame)}
+.brand .sub{font-family:var(--mono);font-size:10px;color:#7C8794;letter-spacing:.12em;margin-top:5px;text-transform:uppercase}
+.nav{padding:8px 0;flex:1;overflow-y:auto}
+.nav button{display:flex;width:100%;gap:10px;align-items:center;background:none;border:0;color:#A7B1BE;
+  font-family:var(--disp);font-size:15px;letter-spacing:.05em;text-transform:uppercase;padding:9px 16px;text-align:left;border-left:3px solid transparent}
+.nav button:hover{color:#fff;background:#1D242C}
+.nav button.on{color:#fff;background:#1D242C;border-left-color:var(--flame)}
+.nav .idx{font-family:var(--mono);font-size:10px;color:#5C6672;width:14px}
+.nav button.on .idx{color:var(--flame)}
+.railfoot{padding:12px 16px;border-top:1px solid #2A323C;font-family:var(--mono);font-size:10px;color:#5C6672;line-height:1.6}
+.main{flex:1;min-width:0;padding:0 26px 60px}
+
+/* ---------- month strip ---------- */
+.strip{position:sticky;top:0;z-index:40;background:var(--surface);padding:14px 0 12px;border-bottom:1px solid var(--line);
+  display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-bottom:22px}
+.pick label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--steel);margin-bottom:4px}
+select,input[type=text],input[type=number],input[type=date]{font-family:var(--mono);font-size:13px;padding:7px 9px;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:var(--r)}
+select{min-width:150px}
+.stripmeta{margin-left:auto;text-align:right;font-family:var(--mono);font-size:10.5px;color:var(--steel);line-height:1.6}
+
+/* ---------- generic ---------- */
+.page{display:none;animation:fade .18s ease-out}
+.page.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.page{animation:none}}
+.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--flame);margin-bottom:6px}
+.lede{color:var(--steel);max-width:62ch;margin:6px 0 22px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;margin-bottom:18px}
+.card > h3{margin-bottom:2px}
+.card .cap{font-family:var(--mono);font-size:10.5px;color:var(--mute);margin-bottom:14px}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.g6{grid-template-columns:repeat(6,minmax(0,1fr))}
+@media(max-width:1180px){.g4,.g6{grid-template-columns:repeat(3,minmax(0,1fr))}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:900px){
+  .g2,.g3,.g4,.g6{grid-template-columns:1fr}
+  .main{padding:0 14px 70px}
+  .rail{position:fixed;left:0;top:0;bottom:0;z-index:120;transform:translateX(-100%);transition:transform .22s ease;box-shadow:0 0 40px rgba(0,0,0,.4)}
+  .rail.open{transform:none}
+  .topbar{display:flex !important}
+  .strip{top:52px}
+  .scrim{display:none;position:fixed;inset:0;background:rgba(10,14,19,.55);z-index:110}
+  .scrim.open{display:block}
+  h1{font-size:24px}
+  .gaprow{grid-template-columns:1fr;gap:5px}
+  .gaprow .gv{text-align:left}
+  .lever{grid-template-columns:1fr;gap:5px}
+  .lever .lv{text-align:left}
+  .act dl{grid-template-columns:1fr;gap:0}
+  .act dt{padding-top:7px}
+  table{font-size:11.5px}
+}
+@media (prefers-reduced-motion:reduce){.rail{transition:none}}
+.topbar{display:none;position:sticky;top:0;z-index:100;background:var(--ink);color:#fff;align-items:center;gap:12px;
+  padding:9px 14px;margin:0 -14px 0;height:52px}
+.topbar .mk{font-family:var(--disp);font-size:17px;letter-spacing:.05em;text-transform:uppercase}
+.topbar .mk b{color:var(--flame)}
+.topbar .now{margin-left:auto;font-family:var(--mono);font-size:10px;color:#8A94A2;text-transform:uppercase;letter-spacing:.08em}
+.burger{background:none;border:1px solid #39424D;border-radius:3px;width:34px;height:30px;display:flex;flex-direction:column;
+  justify-content:center;align-items:center;gap:3.5px;padding:0}
+.burger i{display:block;width:15px;height:1.8px;background:#fff}
+
+/* ---------- kpi tile ---------- */
+.kpi{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px 12px;position:relative}
+.kpi .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--steel);min-height:24px}
+.kpi .v{font-family:var(--disp);font-size:27px;font-weight:700;line-height:1.05;margin:5px 0 2px}
+.kpi .d{font-family:var(--mono);font-size:11px;display:flex;gap:6px;align-items:baseline;border-top:1px dotted var(--line);padding-top:6px;margin-top:7px}
+.up{color:var(--moss)} .down{color:var(--flame)} .flat{color:var(--mute)}
+.kpi .prev{color:var(--mute);font-size:10px}
+.kpi .n{position:absolute;top:9px;right:10px;font-family:var(--mono);font-size:9px;color:#C3CAD3}
+
+/* ---------- tables ---------- */
+.tw{overflow:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--paper);max-height:560px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{position:sticky;top:0;background:var(--ink);color:#fff;font-family:var(--disp);font-size:12px;letter-spacing:.06em;
+  text-transform:uppercase;text-align:left;padding:8px 10px;white-space:nowrap;z-index:2;cursor:pointer;font-weight:600}
+th.r,td.r{text-align:right}
+td{padding:6px 10px;border-bottom:1px solid var(--hair);white-space:nowrap}
+tbody tr:hover{background:#F6F8FA}
+td.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tag{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:2px;border:1px solid}
+.t-star{color:#8A6A00;border-color:#E5CE87;background:#FDF6E0}
+.t-plow{color:#0B5AA8;border-color:#B4CFE9;background:#EAF2FA}
+.t-puz{color:#6B4E9E;border-color:#CFC1E6;background:#F3EFFA}
+.t-dog{color:var(--flame);border-color:#EFC0C8;background:#FCEDEF}
+
+/* ---------- buttons ---------- */
+.btn{background:var(--ink);color:#fff;border:1px solid var(--ink);border-radius:var(--r);padding:9px 15px;
+  font-family:var(--disp);font-size:14px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+.btn:hover{background:var(--slate)}
+.btn.red{background:var(--flame);border-color:var(--flame)}
+.btn.red:hover{background:#A80D26}
+.btn.ghost{background:none;color:var(--ink);border-color:var(--line)}
+.btn.ghost:hover{background:var(--paper);border-color:var(--steel)}
+.btn.sm{padding:5px 10px;font-size:12px}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+
+/* ---------- dropzone ---------- */
+.drop{border:2px dashed var(--line);border-radius:var(--r);background:var(--paper);padding:44px 20px;text-align:center;transition:border-color .15s,background .15s}
+.drop.hot{border-color:var(--flame);background:#FFF7F8}
+.drop .big{font-family:var(--disp);font-size:22px;text-transform:uppercase}
+.drop .sm{color:var(--steel);font-size:12.5px;margin-top:6px}
+
+/* ---------- gap board (signature) ---------- */
+.board{background:var(--ink);border-radius:var(--r);padding:22px 24px 24px;color:#fff;position:relative;overflow:hidden}
+.board h2{color:#fff}
+.board .bcap{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#7C8794;margin-bottom:18px}
+.tapebox{background:var(--tape);color:#141A21;display:inline-block;padding:8px 16px 6px;transform:rotate(-1.1deg);box-shadow:0 2px 0 rgba(0,0,0,.35)}
+.tapebox .tl{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase}
+.tapebox .tv{font-family:var(--disp);font-size:36px;font-weight:700;line-height:1}
+.gaprow{display:grid;grid-template-columns:200px 1fr 118px;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid #2C343E}
+.gaprow:last-child{border-bottom:0}
+.gaprow .gl{font-family:var(--disp);font-size:15px;text-transform:uppercase;letter-spacing:.03em}
+.gaprow .gl small{display:block;font-family:var(--mono);font-size:9.5px;color:#7C8794;letter-spacing:.06em;text-transform:none}
+.gbar{height:16px;background:#2C343E;border-radius:2px;overflow:hidden}
+.gbar i{display:block;height:100%;background:var(--tape)}
+.gaprow .gv{font-family:var(--mono);font-size:13px;text-align:right;color:var(--tape)}
+
+/* ---------- action cards ---------- */
+.act{background:var(--paper);border:1px solid var(--line);border-left:4px solid var(--flame);border-radius:var(--r);padding:15px 17px;margin-bottom:12px}
+.act .ah{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:8px}
+.act .at{font-family:var(--disp);font-size:17px;text-transform:uppercase;line-height:1.1}
+.act .pk{font-family:var(--mono);font-size:15px;color:var(--moss);white-space:nowrap;font-weight:600}
+.act dl{display:grid;grid-template-columns:78px 1fr;gap:3px 12px;margin:0;font-size:12.5px}
+.act dt{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--steel);padding-top:3px}
+.act dd{margin:0;color:var(--slate)}
+
+.script{background:#FBFCFD;border:1px solid var(--line);border-left:3px solid var(--navy);padding:11px 14px;margin-bottom:9px;border-radius:var(--r)}
+.script .sw{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--steel);margin-bottom:4px}
+.script q{font-size:14px;font-style:italic;color:var(--ink)}
+
+.wk{border:1px solid var(--line);background:var(--paper);border-radius:var(--r);padding:13px 15px}
+.wk h4{font-family:var(--disp);font-size:14px;text-transform:uppercase;color:var(--flame);margin-bottom:8px}
+.wk label{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;padding:4px 0;cursor:pointer;color:var(--slate)}
+.wk input{margin-top:3px;accent-color:var(--flame)}
+
+.lever{display:grid;grid-template-columns:1fr 130px 96px;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--hair)}
+.lever:last-child{border-bottom:0}
+.lever .ln{font-size:13px;font-weight:500}
+.lever .ls{font-family:var(--mono);font-size:10.5px;color:var(--steel)}
+.lever input[type=range]{width:100%;accent-color:var(--flame)}
+.lever .lv{font-family:var(--mono);font-size:13px;text-align:right;color:var(--moss);font-weight:600}
+.cov{height:22px;background:var(--hair);border-radius:2px;overflow:hidden;position:relative;margin:10px 0 4px}
+.cov i{display:block;height:100%;background:var(--moss);transition:width .2s}
+.cov span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:#fff;text-shadow:0 0 3px rgba(0,0,0,.6)}
+
+.note{background:#FFFBEB;border:1px solid #F0DFA8;border-radius:var(--r);padding:11px 14px;font-size:12.5px;color:#6B5714}
+.warn{background:#FCEDEF;border:1px solid #EFC0C8;border-radius:var(--r);padding:11px 14px;font-size:12.5px;color:#7E1223}
+.ok{background:#EDF6F0;border:1px solid #B9DCC7;border-radius:var(--r);padding:11px 14px;font-size:12.5px;color:#1D5334}
+.heat{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px}
+.hc{border-radius:var(--r);padding:11px 12px;border:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;gap:2px}
+.hc .hk{font-family:var(--disp);font-size:14px;text-transform:uppercase;letter-spacing:.03em;line-height:1.1}
+.hc .hv{font-family:var(--mono);font-size:16px;font-weight:600}
+.hc .hn{font-family:var(--mono);font-size:10px;opacity:.75}
+.summary{font-size:15px;line-height:1.65;color:var(--slate)}
+.summary b{color:var(--ink)}
+.mini{font-family:var(--mono);font-size:10.5px;color:var(--mute)}
+.empty{text-align:center;padding:52px 20px;color:var(--steel)}
+.empty .big{font-family:var(--disp);font-size:20px;text-transform:uppercase;color:var(--ink)}
+.qbadge{display:inline-flex;gap:5px;align-items:center;font-family:var(--mono);font-size:10px}
+hr.h{border:0;border-top:1px solid var(--hair);margin:16px 0}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;color:var(--steel);margin-top:8px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+.sw{display:flex;gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.sw button{background:var(--paper);border:0;border-right:1px solid var(--line);padding:6px 12px;font-family:var(--mono);font-size:11px;color:var(--steel)}
+.sw button:last-child{border-right:0}
+.sw button.on{background:var(--ink);color:#fff}
+#toast{position:fixed;right:20px;bottom:20px;background:var(--ink);color:#fff;padding:11px 16px;border-radius:var(--r);
+  font-family:var(--mono);font-size:12px;opacity:0;transform:translateY(8px);transition:.2s;pointer-events:none;z-index:99;max-width:340px}
+#toast.on{opacity:1;transform:none}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+svg text{font-family:var(--mono)}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="brand">
+      <div class="mk">Pulse<b>·</b>PM</div>
+      <div class="sub">Product Mix Analyzer</div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="railfoot">
+      Files stay in this browser.<br>Nothing is uploaded.
+    </div>
+  </aside>
+
+  <div class="scrim" id="scrim"></div>
+  <main class="main">
+    <div class="topbar">
+      <button class="burger" id="burger" aria-label="Open menu"><i></i><i></i><i></i></button>
+      <span class="mk">Pulse<b>·</b>PM</span>
+      <span class="now" id="nowPage">Files</span>
+    </div>
+    <div class="strip" id="strip" hidden>
+      <div class="pick">
+        <label for="mSel">Month</label>
+        <select id="mSel"></select>
+      </div>
+      <div class="pick">
+        <label for="cSel">Compare against</label>
+        <select id="cSel"></select>
+      </div>
+      <div class="pick">
+        <label for="basis">Basis</label>
+        <div class="sw" id="basis">
+          <button data-b="raw" class="on">Raw total</button>
+          <button data-b="day">Per day</button>
+        </div>
+      </div>
+      <div class="stripmeta" id="stripMeta"></div>
+    </div>
+
+    <section class="page on" id="p-upload"></section>
+    <section class="page" id="p-overview"></section>
+    <section class="page" id="p-movers"></section>
+    <section class="page" id="p-pizza"></section>
+    <section class="page" id="p-menu"></section>
+    <section class="page" id="p-trends"></section>
+    <section class="page" id="p-coach"></section>
+    <section class="page" id="p-kpis"></section>
+    <section class="page" id="p-data"></section>
+    <section class="page" id="p-setup"></section>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+/* =====================================================================
+   PULSE PM ANALYZER  —  core: storage, parsing, model
+   ===================================================================== */
+if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+/* ---------- tiny helpers ---------- */
+const $  = (s,r)=> (r||document).querySelector(s);
+const $$ = (s,r)=> Array.from((r||document).querySelectorAll(s));
+const el = (h)=>{const d=document.createElement('div');d.innerHTML=h.trim();return d.firstElementChild;};
+const esc= (t)=> String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sum= (a,f)=> a.reduce((s,x)=>s+(f?f(x):x)||0,0);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const PKR = n => 'PKR ' + Math.round(n||0).toLocaleString('en-US');
+const PKR2= n => 'PKR ' + (n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const K   = n => { n=n||0; if(Math.abs(n)>=1e6) return (n/1e6).toFixed(2)+'M'; if(Math.abs(n)>=1e3) return (n/1e3).toFixed(1)+'k'; return Math.round(n).toString(); };
+const PKRk= n => 'PKR '+K(n);
+const NUM = n => Math.round(n||0).toLocaleString('en-US');
+const PCT = (n,d)=> (n==null||isNaN(n)?'—':(n*100).toFixed(d==null?1:d)+'%');
+const PP  = n => (n>=0?'+':'')+(n*100).toFixed(1)+'pp';
+const dg  = n => n>0?'up':(n<0?'down':'flat');
+const arrow=n=> n>0?'▲':(n<0?'▼':'—');
+function toast(m,ms){const t=$('#toast');t.innerHTML=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),ms||2600);}
+
+/* ---------- persistence (window.storage w/ memory fallback) ---------- */
+const MEM = {};
+const store = {
+  async get(k){
+    try{ if(window.storage){ const r = await window.storage.get(k,false); return r? JSON.parse(r.value): (MEM[k]??null); } }catch(e){}
+    return MEM[k] ?? null;
+  },
+  async set(k,v){
+    MEM[k]=v;
+    try{ if(window.storage) await window.storage.set(k, JSON.stringify(v), false); }catch(e){}
+    return v;
+  },
+  async del(k){ delete MEM[k]; try{ if(window.storage) await window.storage.delete(k,false);}catch(e){} }
+};
+
+/* ---------- domain constants ---------- */
+const NONFOOD   = ['Delivery'];
+const PIZZACATS = ['Pizza','LddPizza'];
+const CAT_SIDES = ['Sides','Bread'];
+const CAT_DRINK = ['Drinks'];
+const CAT_DESS  = ['Desserts'];
+const CAT_DIP   = ['Sauce'];
+const PREMIUM   = ['Stuffed Cheese','Stuffed Kebab','New Yorker','Cheese Burst','Double Melt','Italian Crust'];
+const CRUSTS    = ['Pan','Classic Hand Tossed','Crunchy Thin','Italian Crust','Stuffed Cheese','Stuffed Kebab','New Yorker','Cheese Burst','Double Melt'];
+const SIZE_ORDER= ['6"-Small','10"-Medium','12"-Large','16" Extra Large'];
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function normCrust(s){
+  if(!s) return '';
+  let t = s.replace(/\s+/g,' ').trim();
+  const map = {'classic hand tossed':'Classic Hand Tossed','hand tossed':'Classic Hand Tossed','crunchy thin':'Crunchy Thin',
+    'italian crust':'Italian Crust','stuffed cheese':'Stuffed Cheese','stuffed kebab':'Stuffed Kebab','new yorker':'New Yorker',
+    'cheese burst':'Cheese Burst','double melt':'Double Melt','pan':'Pan'};
+  const k = t.toLowerCase();
+  if(map[k]) return map[k];
+  for(const m in map){ if(k.indexOf(m)>=0) return map[m]; }
+  return t;
+}
+function normSize(s){
+  if(!s) return '';
+  let t = s.replace(/\s+/g,' ').trim();
+  if(/^6"/.test(t)) return '6"-Small';
+  if(/^10"/.test(t)) return '10"-Medium';
+  if(/^12"/.test(t)) return '12"-Large';
+  if(/^16"/.test(t)) return '16" Extra Large';
+  if(/^large$/i.test(t)) return '12"-Large';
+  if(/^medium$/i.test(t)) return '10"-Medium';
+  if(/^small$/i.test(t)) return '6"-Small';
+  return t;
+}
+const isPizza = r => PIZZACATS.indexOf(r.cat)>=0;
+const isFood  = r => NONFOOD.indexOf(r.cat)<0;
+
+/* =====================================================================
+   PDF PARSER  — coordinate-aware reconstruction of Pulse v3.9 layout
+   ===================================================================== */
+const COLNAMES = ['cat','item','size','crust','net','qty','pmix','smix','orders','pop'];
+const HEADS = ['Menu Category','Menu Item','Size','Flavor/Crust','Net Amount','Quantity','Product Mix','Sales Mix','Orders','Percent of Orders'];
+const JUNK = [/^Product Mix$/i,/^Begin Date:?$/i,/^End Date:?$/i,/^Team Member:?/i,/Domino'?s Pulse/i,/^MKT\d+/i,/^Page \d+$/i,/^\d{1,2}\/\d{1,2}\/\d{4}$/,/^©/];
+
+function toNum(s){ if(s==null) return null; const t=String(s).replace(/PKR|,|\s/g,'').replace(/%/g,''); if(t===''||isNaN(Number(t))) return null; return Number(t); }
+
+async function parsePDF(file, onProgress){
+  const buf  = await file.arrayBuffer();
+  const doc  = await pdfjsLib.getDocument({data:buf}).promise;
+  const meta = {store:'', member:'', begin:'', end:''};
+  const warnings=[]; const rows=[];
+  let spans=null, currentCat='', rec=null;
+
+  const push = ()=>{
+    if(!rec) return;
+    const net = toNum(rec.net), qty = toNum(rec.qty);
+    const name=(rec.item||'').replace(/\s+/g,' ').trim();
+    if(net!=null && qty!=null && qty>0 && name){
+      const unit = net/qty;
+      rows.push({
+        cat: rec.cat || currentCat, item: name,
+        size: normSize(rec.size), crust: normCrust(rec.crust),
+        net, qty, unit,
+        pmix:(toNum(rec.pmix)||0)/100, smix:(toNum(rec.smix)||0)/100,
+        orders: toNum(rec.orders)||0, pop:(toNum(rec.pop)||0)/100
+      });
+      if(unit < 5 || unit > 25000) warnings.push('Odd unit price on "'+name+'" — '+PKR2(unit)+' each. Worth checking.');
+    }
+    rec=null;
+  };
+
+  for(let p=1;p<=doc.numPages;p++){
+    if(onProgress) onProgress(p, doc.numPages);
+    const page = await doc.getPage(p);
+    const tc   = await page.getTextContent();
+    let items = tc.items.filter(i=>i.str && i.str.trim()!=='')
+      .map(i=>({s:i.str, x:i.transform[4], w:i.width||0, y:i.transform[5]}));
+    if(!items.length) continue;
+
+    items.sort((a,b)=> (b.y-a.y) || (a.x-b.x));
+    const lines=[]; let cur=[];
+    for(const it of items){
+      if(!cur.length || Math.abs(cur[0].y - it.y) <= 3.2) cur.push(it);
+      else { lines.push(cur.sort((a,b)=>a.x-b.x)); cur=[it]; }
+    }
+    if(cur.length) lines.push(cur.sort((a,b)=>a.x-b.x));
+
+    for(const ln of lines){
+      const joined = ln.map(i=>i.s.trim()).join(' ').replace(/\s+/g,' ').trim();
+
+      /* --- header line: learn the ten column spans --- */
+      if(joined.indexOf('Menu Category')>=0 && joined.indexOf('Net Amount')>=0){
+        const sp = headerSpans(ln);
+        if(sp) spans = sp;
+        continue;
+      }
+      /* --- metadata --- */
+      const mm = joined.match(/Team Member:\s*(.+?)\s+(\d{4,6}\s+\S.*)$/);
+      if(mm){ meta.member=mm[1].trim(); meta.store=mm[2].trim(); }
+      const dd = joined.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+      if(dd && /Begin Date/.test(joined)) meta.begin=dd[1];
+      else if(dd && /End Date/.test(joined)) meta.end=dd[1];
+      else if(dd && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(joined)){ if(!meta.begin) meta.begin=dd[1]; else if(!meta.end) meta.end=dd[1]; }
+
+      if(!spans) continue;
+      if(JUNK.some(rx=>rx.test(joined))) continue;
+      if(/Begin Date|End Date|Team Member/.test(joined)) continue;
+
+      /* --- split the line into the ten columns --- */
+      const cells={}; COLNAMES.forEach(c=>cells[c]='');
+      const numStart = spans[4][0]-12;
+      for(const it of ln){
+        for(const t of splitToken(it, numStart)){
+          const cen=(t.x0+t.x1)/2;
+          let ci;
+          if(cen > numStart){                       // numeric block: right-aligned
+            ci=4; let best=Infinity;
+            for(let k=4;k<10;k++){ const d=Math.abs(t.x1-spans[k][1]); if(d<best){best=d;ci=k;} }
+          }else{                                    // text block: left-aligned
+            ci=0;
+            for(let k=0;k<4;k++){ if(t.x0+6 >= spans[k][0]) ci=k; }
+          }
+          const c=COLNAMES[ci];
+          cells[c] = (ci>=4) ? cells[c]+t.s : (cells[c]? cells[c]+' '+t.s : t.s);
+        }
+      }
+
+      const hasMoney = /PKR|Rs\.?\s*\d/.test(cells.net);
+      const onlyCat  = cells.cat && COLNAMES.slice(1).every(c=>!cells[c]);
+
+      if(onlyCat){ push(); currentCat = cells.cat.replace(/\s+/g,' ').trim(); continue; }
+      if(hasMoney){
+        push();
+        rec = Object.assign({}, cells);
+        if(rec.cat) currentCat = rec.cat.replace(/\s+/g,' ').trim();
+        rec.cat = currentCat;
+      } else if(rec){
+        for(const c of COLNAMES){
+          if(!cells[c] || c==='cat') continue;
+          if(c==='net'||c==='qty') rec[c] = (rec[c]||'')+cells[c];               // split decimals rejoin
+          else if(['pmix','smix','orders','pop'].indexOf(c)>=0) rec[c] = rec[c] || cells[c];
+          else rec[c] = (rec[c]? rec[c]+' ':'') + cells[c];                       // wrapped names
+        }
+      }
+    }
+    push();
+  }
+  push();
+
+  if(!rows.length) throw new Error('No product rows found. This needs to be a Pulse "Product Mix" PDF export — a scan or screenshot will not work.');
+
+  const ests = rows.filter(r=>r.pop>0.005 && r.orders>0).map(r=>r.orders/r.pop).sort((a,b)=>a-b);
+  const totalOrders = ests.length ? Math.round(ests[Math.floor(ests.length/2)])
+                                  : rows.reduce((m,r)=>Math.max(m,r.orders),0);
+
+  const b = parseDate(meta.begin), e = parseDate(meta.end);
+  const days = (b&&e) ? Math.max(1,Math.round((e-b)/864e5)+1) : 30;
+  const id = b ? b.getFullYear()+'-'+String(b.getMonth()+1).padStart(2,'0') : 'file-'+Date.now();
+  const label = b ? MONTHS[b.getMonth()]+' '+b.getFullYear() : file.name.replace(/\.pdf$/i,'');
+
+  const smixSum = sum(rows,r=>r.smix);
+  if(smixSum < .5 || smixSum > 1.6) warnings.push('Sales-mix percentages add up to '+PCT(smixSum)+' instead of 100%. The report may be partially cut off.');
+
+  return {id, label, begin:meta.begin, end:meta.end, days, store:meta.store, member:meta.member,
+          rows, totalOrders, warnings, file:file.name, added:Date.now()};
+}
+
+/* Map the header row to ten [start,end] x-spans. Works whether the PDF emits
+   one text run per word or one per phrase. */
+function headerSpans(ln){
+  let str=''; const map=[];
+  for(const it of ln){
+    const t=it.s;
+    if(str && !/\s$/.test(str) && !/^\s/.test(t)){ str+=' '; map.push({x0:it.x,x1:it.x}); }
+    for(let i=0;i<t.length;i++){
+      map.push({x0: it.x + it.w*(i/t.length), x1: it.x + it.w*((i+1)/t.length)});
+    }
+    str += t;
+  }
+  const spans=[]; let cursor=0;
+  for(const h of HEADS){
+    const i = str.indexOf(h, cursor);
+    if(i<0) return null;
+    const a=map[i], b=map[Math.min(map.length-1, i+h.length-1)];
+    if(!a||!b) return null;
+    spans.push([a.x0, b.x1]);
+    cursor = i + h.length;
+  }
+  for(let k=1;k<spans.length;k++) if(spans[k][0] <= spans[k-1][0]) return null;
+  return spans;
+}
+
+/* A run like "PKR60,156.5 110" must not be treated as one cell. Split on
+   whitespace and apportion the width so each token keeps its own edges. */
+function splitToken(it, numStart){
+  const raw = it.s;
+  const x0 = it.x, x1 = it.x + it.w;
+  const trimmed = raw.trim();
+  if(!trimmed) return [];
+  if(!/\s/.test(trimmed) || (x0+it.w/2) <= numStart) return [{s:trimmed, x0, x1}];
+  const parts=[]; const re=/\S+/g; let m;
+  while((m=re.exec(raw))!==null){
+    const a = x0 + it.w*(m.index/raw.length);
+    const b = x0 + it.w*((m.index+m[0].length)/raw.length);
+    parts.push({s:m[0], x0:a, x1:b});
+  }
+  return parts;
+}
+
+function parseDate(s){ if(!s) return null; const m=String(s).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(!m) return null; return new Date(+m[3], +m[1]-1, +m[2]); }
+
+/* =====================================================================
+   METRIC ENGINE — the 50 KPIs
+   ===================================================================== */
+function groupBy(rows, key){
+  const m = new Map();
+  for(const r of rows){ const k = typeof key==='function'? key(r): r[key]; if(!m.has(k)) m.set(k,[]); m.get(k).push(r); }
+  return m;
+}
+function rollup(rows, key){
+  const out=[];
+  for(const [k,rs] of groupBy(rows,key)){
+    out.push({key:k, net:sum(rs,r=>r.net), qty:sum(rs,r=>r.qty), orders:sum(rs,r=>r.orders), n:rs.length,
+              unit: sum(rs,r=>r.qty)? sum(rs,r=>r.net)/sum(rs,r=>r.qty):0, rows:rs});
+  }
+  return out.sort((a,b)=>b.net-a.net);
+}
+const skuKey = r => [r.item, r.size, r.crust].filter(Boolean).join(' · ');
+
+function compute(M, costs){
+  costs = costs || {};
+  const rows  = M.rows;
+  const food  = rows.filter(isFood);
+  const fees  = rows.filter(r=>!isFood(r));
+  const sales = sum(food,r=>r.net);
+  const units = sum(food,r=>r.qty);
+  const orders= M.totalOrders || 1;
+  const days  = M.days || 30;
+
+  const byCat  = rollup(food, 'cat');
+  const bySku  = rollup(food, skuKey);
+  const pizzas = food.filter(isPizza);
+  const attach = cats => sum(food.filter(r=>cats.indexOf(r.cat)>=0), r=>r.orders)/orders;
+
+  // Pareto
+  const sorted=[...bySku].sort((a,b)=>b.net-a.net); let run=0, p80=0;
+  for(const s of sorted){ run+=s.net; p80++; if(run>=sales*.8) break; }
+
+  // margin (real when cost supplied, price-proxy otherwise)
+  const catAvgUnit = {}; byCat.forEach(c=> catAvgUnit[c.key]=c.unit);
+  const sku = bySku.map(s=>{
+    const r0 = s.rows[0];
+    const cost = costs[s.key];
+    const hasCost = cost!=null && cost>0;
+    const unitCost = hasCost ? (cost<=1 ? s.unit*cost : cost) : null;   // <=1 treated as a food-cost ratio
+    const margin = hasCost ? s.unit-unitCost : s.unit - (catAvgUnit[r0.cat]||s.unit);
+    return {...s, cat:r0.cat, item:r0.item, size:r0.size, crust:r0.crust,
+            hasCost, unitCost, margin, marginPct: hasCost? (s.unit-unitCost)/s.unit : null,
+            contrib: hasCost ? (s.unit-unitCost)*s.qty : null,
+            qtyShare: s.qty/units, netShare: s.net/sales,
+            eff: (s.net/sales)/((s.qty/units)||1)};
+  });
+
+  // menu-engineering quadrants, computed inside each category
+  const catQty = {}; byCat.forEach(c=> catQty[c.key]=c.qty);
+  const catCount={}; sku.forEach(s=> catCount[s.cat]=(catCount[s.cat]||0)+1);
+  sku.forEach(s=>{
+    const popCut  = 0.7 * (1/(catCount[s.cat]||1));
+    const popular = (s.qty/(catQty[s.cat]||1)) >= popCut;
+    const profitable = s.hasCost ? s.margin >= median(sku.filter(x=>x.cat===s.cat&&x.hasCost).map(x=>x.margin))
+                                 : s.unit >= (catAvgUnit[s.cat]||0);
+    s.pop_ = popular; s.prof_ = profitable;
+    s.quad = popular ? (profitable?'Star':'Plow-horse') : (profitable?'Puzzle':'Dog');
+  });
+
+  const q = n => sku.filter(s=>s.quad===n);
+  const starShare = sum(q('Star'),s=>s.net)/sales;
+
+  // pizza detail
+  const pzQty  = sum(pizzas,r=>r.qty)||1;
+  const bySize = rollup(pizzas,'size').sort((a,b)=>SIZE_ORDER.indexOf(a.key)-SIZE_ORDER.indexOf(b.key));
+  const byCrust= rollup(pizzas,'crust');
+  const byFlav = rollup(pizzas,'item');
+  const premQty= sum(pizzas.filter(r=>PREMIUM.indexOf(r.crust)>=0),r=>r.qty);
+  const panQty = sum(pizzas.filter(r=>r.crust==='Pan'),r=>r.qty);
+  const panUnit= (()=>{const p=pizzas.filter(r=>r.crust==='Pan');return sum(p,r=>r.qty)?sum(p,r=>r.net)/sum(p,r=>r.qty):0;})();
+  const premUnit=(()=>{const p=pizzas.filter(r=>PREMIUM.indexOf(r.crust)>=0);return sum(p,r=>r.qty)?sum(p,r=>r.net)/sum(p,r=>r.qty):0;})();
+  const med = pizzas.filter(r=>r.size==='10"-Medium' && r.crust==='Pan');
+  const lrg = pizzas.filter(r=>r.size==='12"-Large' && r.crust==='Pan');
+  const medUnit = sum(med,r=>r.qty)? sum(med,r=>r.net)/sum(med,r=>r.qty):0;
+  const lrgUnit = sum(lrg,r=>r.qty)? sum(lrg,r=>r.net)/sum(lrg,r=>r.qty):0;
+  const medQty  = sum(med,r=>r.qty);
+
+  // dip flavour preference
+  const dips = rollup(food.filter(r=>CAT_DIP.indexOf(r.cat)>=0),'item');
+  const dipTotal = sum(dips,d=>d.qty)||1;
+
+  const deliveryOrders = sum(fees.filter(r=>/delivery fee/i.test(r.item)), r=>r.orders);
+  const aggOrders      = sum(fees.filter(r=>/panda|platform|aggregat/i.test(r.item)), r=>r.orders);
+  const feeTotal       = sum(fees,r=>r.net);
+  const aggFees        = sum(fees.filter(r=>/panda|platform/i.test(r.item)), r=>r.net);
+
+  const m = {
+    /* 1-6 headline */
+    sales, units, orders, aov: sales/orders, upo: units/orders, asp: units? sales/units:0,
+    days, salesPerDay: sales/days, ordersPerDay: orders/days,
+    /* 7-14 movers */
+    topRev: [...sku].sort((a,b)=>b.net-a.net).slice(0,20),
+    topQty: [...sku].sort((a,b)=>b.qty-a.qty).slice(0,20),
+    slow:   [...sku].filter(s=>s.qty<=5).sort((a,b)=>a.qty-b.qty).slice(0,30),
+    dead:   sku.filter(s=>s.qty<=2),
+    p80, p80pct:p80/sku.length,
+    longTail: sku.filter(s=>s.netShare<0.01).length/sku.length,
+    revPerSku: sales/sku.length,
+    skuCount: sku.length,
+    /* 15-18 category */
+    byCat: byCat.map(c=>({...c, revShare:c.net/sales, qtyShare:c.qty/units, ticket:c.orders? c.net/c.orders:0, attach:c.orders/orders})),
+    /* 19-24 pizza */
+    bySize: bySize.map(s=>({...s, share:s.qty/pzQty})),
+    byCrust: byCrust.map(c=>({...c, share:c.qty/pzQty})),
+    byFlav: byFlav.slice(0,15).map(f=>({...f, share:f.qty/pzQty})),
+    pizzaQty: pzQty, pizzaNet: sum(pizzas,r=>r.net),
+    premPen: premQty/pzQty, panDep: panQty/pzQty, panUnit, premUnit,
+    medUnit, lrgUnit, medQty, upsizeDelta: Math.max(0,lrgUnit-medUnit),
+    /* 25-28 attach */
+    atSides: attach(CAT_SIDES), atDess: attach(CAT_DESS), atDrink: attach(CAT_DRINK), atDip: attach(CAT_DIP),
+    dips: dips.map(d=>({...d, share:d.qty/dipTotal})),
+    /* 29-30 channel */
+    deliveryOrders, aggOrders, deliveryPen: deliveryOrders/orders, aggPen: aggOrders/orders,
+    ownPen: Math.max(0,(orders-aggOrders)/orders), feeTotal, aggFees, feeLeak: aggFees/sales,
+    /* 41-45 pricing */
+    catAvgUnit,
+    upsizeValue: Math.max(0,lrgUnit-medUnit) * medQty * 0.10,
+    premUplift: Math.max(0,premUnit-panUnit) * premQty,
+    /* 46-50 basket & risk */
+    addonPerOrder: Math.max(0,(units - sum(pizzas,r=>r.qty))/orders),
+    comboPen: sum(food.filter(r=>r.cat==='MyBox'||r.cat==='LddPizza'), r=>r.orders)/orders,
+    top5Conc: sum([...sku].sort((a,b)=>b.net-a.net).slice(0,5), s=>s.net)/sales,
+    /* menu engineering */
+    sku, quads:{Star:q('Star'),'Plow-horse':q('Plow-horse'),Puzzle:q('Puzzle'),Dog:q('Dog')},
+    starShare, hasCosts: sku.some(s=>s.hasCost),
+    contribTotal: sum(sku.filter(s=>s.hasCost), s=>s.contrib),
+    velocity: sku.filter(s=>s.qty>0).length/sku.length,
+    avgDessPrice: avgUnit(food,CAT_DESS), avgDrinkPrice: avgUnit(food,CAT_DRINK),
+    avgSidePrice: avgUnit(food,CAT_SIDES), avgDipPrice: avgUnit(food,CAT_DIP)
+  };
+  /* KPI 42-43 price realization: current price against the best price this item
+     has ever achieved across every loaded month = a proxy for list price */
+  m.realization = m.sku.map(s=>{
+    const list = (window.__listPrice && window.__listPrice[s.key]) || s.unit;
+    return {...s, list, real: list? s.unit/list : 1};
+  }).filter(s=>s.qty>=5).sort((a,b)=>a.real-b.real);
+  m.leaks = m.realization.filter(s=>s.real<0.90);
+
+  /* KPI 49 co-occurrence proxy: how often each add-on group rides along with each main group */
+  const mains=['Pizza','LddPizza','MyBox','Pockets','Chicken'];
+  m.cooc = mains.filter(x=>byCat.some(c=>c.key===x)).map(x=>{
+    const mo = (byCat.find(c=>c.key===x)||{orders:0}).orders;
+    return {main:x, orders:mo, share:mo/orders,
+            sides:m.atSides, drink:m.atDrink, dess:m.atDess, dip:m.atDip};
+  });
+  m.health = healthScore(m);
+  return m;
+}
+function avgUnit(rows,cats){ const r=rows.filter(x=>cats.indexOf(x.cat)>=0); const q=sum(r,x=>x.qty); return q? sum(r,x=>x.net)/q : 0; }
+function median(a){ if(!a.length) return 0; const s=[...a].sort((x,y)=>x-y); const i=Math.floor(s.length/2); return s.length%2? s[i] : (s[i-1]+s[i])/2; }
+
+function healthScore(m){
+  const parts = [
+    {k:'Star revenue share', v:clamp(m.starShare/0.45,0,1),         hint:'Share of sales coming from Star items'},
+    {k:'Dead SKU load',      v:clamp(1-(m.dead.length/Math.max(1,m.skuCount))/0.25,0,1), hint:'Items selling 2 units or fewer'},
+    {k:'Menu focus',         v:clamp(1-(m.p80pct-0.15)/0.45,0,1),   hint:'How few items make 80% of sales'},
+    {k:'Menu velocity',      v:clamp(m.velocity,0,1),               hint:'Share of listed items that actually sold'},
+    {k:'Premium crust pull', v:clamp(m.premPen/0.25,0,1),           hint:'Pizzas sold on an upgraded crust'},
+    {k:'Attach strength',    v:clamp((m.atSides+m.atDess+m.atDrink+m.atDip)/2.2,0,1), hint:'Sides, desserts, drinks and dips per order'}
+  ];
+  const score = Math.round(sum(parts,p=>p.v)/parts.length*100);
+  return {score, parts};
+}
+
+/* Approximate Islamic-calendar trading events for Pakistan. Moon-sighting moves
+   these by a day or two, so they are flagged as approximate wherever shown. */
+const SEASON = {
+  2024:{ram:['2024-03-11','2024-04-09'],fitr:'2024-04-10',adha:'2024-06-16'},
+  2025:{ram:['2025-03-01','2025-03-30'],fitr:'2025-03-31',adha:'2025-06-07'},
+  2026:{ram:['2026-02-17','2026-03-19'],fitr:'2026-03-20',adha:'2026-05-27'},
+  2027:{ram:['2027-02-07','2027-03-08'],fitr:'2027-03-09',adha:'2027-05-16'},
+  2028:{ram:['2028-01-27','2028-02-25'],fitr:'2028-02-26',adha:'2028-05-05'}
+};
+function seasonTags(M){
+  const b=parseDate(M.begin), e=parseDate(M.end); if(!b||!e) return [];
+  const y=SEASON[b.getFullYear()]; if(!y) return [];
+  const inRange=d=>{ const x=new Date(d); return x>=b && x<=e; };
+  const overlap=(a,z)=>{ const s1=new Date(a), s2=new Date(z); return s1<=e && s2>=b; };
+  const t=[];
+  if(overlap(y.ram[0],y.ram[1])) t.push({k:'Ramadan',note:'Daytime trade collapses, evening trade spikes. Compare like for like.'});
+  if(inRange(y.fitr)) t.push({k:'Eid al-Fitr',note:'Multi-day family ordering peak.'});
+  if(inRange(y.adha)) t.push({k:'Eid al-Adha',note:'Home meat cooking pulls demand away from pizza for two to three days.'});
+  const mo=b.getMonth();
+  if(mo>=4&&mo<=6) t.push({k:'Exam season',note:'Late-night student delivery runs higher.'});
+  if(mo===11||mo===0) t.push({k:'Winter peak',note:'Delivery demand rises with cold weather.'});
+  return t;
+}
+/* Sibling cannibalisation: one variant of an item climbs while another falls,
+   with the family total barely moving. */
+function cannibalisation(cur, prev){
+  if(!prev) return [];
+  const fam=new Map();
+  const add=(m,tag)=>{ for(const s of m.sku){ if(!fam.has(s.item)) fam.set(s.item,{now:[],was:[]}); fam.get(s.item)[tag].push(s); } };
+  add(cur,'now'); add(prev,'was');
+  const out=[];
+  for(const [item,f] of fam){
+    if(f.now.length<2 || !f.was.length) continue;
+    const wasMap=new Map(f.was.map(s=>[s.key,s]));
+    const moves=f.now.map(s=>({key:s.key, d:s.qty-((wasMap.get(s.key)||{qty:0}).qty), qty:s.qty}))
+                     .filter(x=>Math.abs(x.d)>=4);
+    if(moves.length<2) continue;
+    const up=moves.filter(x=>x.d>0).sort((a,b)=>b.d-a.d)[0];
+    const dn=moves.filter(x=>x.d<0).sort((a,b)=>a.d-b.d)[0];
+    if(!up||!dn) continue;
+    const totNow=sum(f.now,s=>s.qty), totWas=sum(f.was,s=>s.qty);
+    const swing=totWas? Math.abs(totNow-totWas)/totWas : 1;
+    if(swing<=0.12 && Math.min(up.d,-dn.d)>=4)
+      out.push({item, up:up.key, upD:up.d, down:dn.key, downD:dn.d, total:totNow, swing});
+  }
+  return out.sort((a,b)=>b.upD-a.upD).slice(0,10);
+}
+
+/* comparison between two computed metric sets */
+function delta(cur, prev, key, perDay){
+  if(!prev) return null;
+  const a = perDay ? cur[key]/cur.days : cur[key];
+  const b = perDay ? prev[key]/prev.days : prev[key];
+  if(b==null || b===0) return null;
+  return {abs:a-b, pct:(a-b)/Math.abs(b), a, b};
+}
+</script>
+
+
+<script>
+/* =====================================================================
+   CHARTS — hand-rolled SVG, no dependencies
+   ===================================================================== */
+const C = {ink:'#151A21',flame:'#C8102E',navy:'#0B5AA8',tape:'#F2C230',moss:'#2E7D4F',steel:'#5A6675',line:'#D7DDE4'};
+const PALETTE = ['#0B5AA8','#C8102E','#F2C230','#2E7D4F','#6B4E9E','#2E8B94','#B5651D','#8A94A2','#4C5A6B','#9E2B5C','#3F7F3F','#A67C00'];
+
+function barChart(data,{h=250,fmt=NUM,color=C.navy,label='key'}={}){
+  if(!data.length) return '<p class="mini">No data.</p>';
+  const max = Math.max(...data.map(d=>d.value))||1;
+  const bh=20, gap=7, top=6, w=760, lw=210;
+  const H = top + data.length*(bh+gap);
+  let out = '<svg viewBox="0 0 '+w+' '+Math.max(H,40)+'" style="width:100%;height:auto;max-height:'+(h*2)+'px" role="img">';
+  data.forEach((d,i)=>{
+    const y = top + i*(bh+gap);
+    const bw = Math.max(1,(w-lw-90)*(d.value/max));
+    out += '<text x="0" y="'+(y+14)+'" font-size="11.5" fill="'+C.ink+'">'+esc(String(d[label]).slice(0,34))+'</text>';
+    out += '<rect x="'+lw+'" y="'+y+'" width="'+bw+'" height="'+bh+'" fill="'+(d.color||color)+'" rx="1.5"/>';
+    out += '<text x="'+(lw+bw+7)+'" y="'+(y+14)+'" font-size="11" fill="'+C.steel+'">'+fmt(d.value)+'</text>';
+  });
+  return out+'</svg>';
+}
+function donut(data,{fmt=PCT}={}){
+  const tot = sum(data,d=>d.value)||1; let a=-Math.PI/2;
+  const cx=105,cy=105,r=88,ir=52;
+  let arcs='';
+  data.forEach((d,i)=>{
+    const ang = (d.value/tot)*Math.PI*2, b=a+ang;
+    const x1=cx+r*Math.cos(a), y1=cy+r*Math.sin(a), x2=cx+r*Math.cos(b), y2=cy+r*Math.sin(b);
+    const x3=cx+ir*Math.cos(b), y3=cy+ir*Math.sin(b), x4=cx+ir*Math.cos(a), y4=cy+ir*Math.sin(a);
+    const la = ang>Math.PI?1:0;
+    arcs += '<path d="M'+x1+' '+y1+' A'+r+' '+r+' 0 '+la+' 1 '+x2+' '+y2+' L'+x3+' '+y3+' A'+ir+' '+ir+' 0 '+la+' 0 '+x4+' '+y4+' Z" fill="'+PALETTE[i%PALETTE.length]+'"/>';
+    a=b;
+  });
+  let leg='<div class="legend">';
+  data.forEach((d,i)=> leg += '<span><i style="background:'+PALETTE[i%PALETTE.length]+'"></i>'+esc(d.key)+' '+fmt(d.value/tot)+'</span>');
+  leg+='</div>';
+  return '<div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap"><svg viewBox="0 0 210 210" style="width:190px;height:190px;flex:0 0 190px">'+arcs+'</svg><div style="flex:1;min-width:180px">'+leg+'</div></div>';
+}
+function lineChart(series,labels,{fmt=K,h=230,yTitle=''}={}){
+  const w=760, pad={l:62,r:14,t:14,b:34};
+  const all = series.flatMap(s=>s.values.filter(v=>v!=null));
+  if(!all.length) return '<p class="mini">Not enough months yet.</p>';
+  const mx=Math.max(...all), mn=Math.min(0,Math.min(...all));
+  const X = i => pad.l + (labels.length<2?0:(w-pad.l-pad.r)*(i/(labels.length-1)));
+  const Y = v => h-pad.b - (h-pad.t-pad.b)*((v-mn)/((mx-mn)||1));
+  let g='';
+  for(let i=0;i<=4;i++){ const v=mn+(mx-mn)*i/4, y=Y(v);
+    g+='<line x1="'+pad.l+'" y1="'+y+'" x2="'+(w-pad.r)+'" y2="'+y+'" stroke="'+C.line+'" stroke-dasharray="2 3"/>'+
+       '<text x="'+(pad.l-7)+'" y="'+(y+4)+'" font-size="10" fill="'+C.steel+'" text-anchor="end">'+fmt(v)+'</text>'; }
+  series.forEach((s,si)=>{
+    const col = s.color||PALETTE[si%PALETTE.length];
+    const pts = s.values.map((v,i)=> v==null?null:[X(i),Y(v)]).filter(Boolean);
+    if(pts.length>1) g+='<polyline fill="none" stroke="'+col+'" stroke-width="2.2" points="'+pts.map(p=>p.join(',')).join(' ')+'"/>';
+    pts.forEach(p=> g+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="3.6" fill="#fff" stroke="'+col+'" stroke-width="2.2"/>');
+  });
+  labels.forEach((l,i)=> g+='<text x="'+X(i)+'" y="'+(h-11)+'" font-size="10" fill="'+C.steel+'" text-anchor="middle">'+esc(l)+'</text>');
+  let leg = series.length>1? '<div class="legend">'+series.map((s,i)=>'<span><i style="background:'+(s.color||PALETTE[i%PALETTE.length])+'"></i>'+esc(s.name)+'</span>').join('')+'</div>':'';
+  return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:auto">'+g+'</svg>'+leg;
+}
+function scatterMatrix(items,{h=430}={}){
+  const w=760, pad={l:56,r:20,t:20,b:44};
+  if(!items.length) return '<p class="mini">No data.</p>';
+  const xs=items.map(i=>i.x), ys=items.map(i=>i.y);
+  const xmax=Math.max(...xs)*1.08||1, ymin=Math.min(...ys), ymax=Math.max(...ys);
+  const yr=(ymax-ymin)||1;
+  const X=v=>pad.l+(w-pad.l-pad.r)*(v/xmax);
+  const Y=v=>h-pad.b-(h-pad.t-pad.b)*((v-ymin+yr*.08)/(yr*1.16));
+  const xc=X(items.xcut!=null?items.xcut:0), yc=Y(0);
+  const cx=X(median(xs)), cy=Y(median(ys));
+  const QC={'Star':'#C79A00','Plow-horse':C.navy,'Puzzle':'#6B4E9E','Dog':C.flame};
+  let g='<rect x="'+pad.l+'" y="'+pad.t+'" width="'+(w-pad.l-pad.r)+'" height="'+(h-pad.t-pad.b)+'" fill="#FAFBFC" stroke="'+C.line+'"/>';
+  g+='<line x1="'+cx+'" y1="'+pad.t+'" x2="'+cx+'" y2="'+(h-pad.b)+'" stroke="'+C.steel+'" stroke-dasharray="4 4"/>';
+  g+='<line x1="'+pad.l+'" y1="'+cy+'" x2="'+(w-pad.r)+'" y2="'+cy+'" stroke="'+C.steel+'" stroke-dasharray="4 4"/>';
+  const stencil=(t,x,y,anc)=>'<text x="'+x+'" y="'+y+'" font-size="26" fill="#E9EDF1" font-weight="700" text-anchor="'+anc+'" letter-spacing="3">'+t+'</text>';
+  g+=stencil('STARS',w-pad.r-12,pad.t+30,'end')+stencil('PUZZLES',pad.l+12,pad.t+30,'start')
+    +stencil('PLOW-HORSES',w-pad.r-12,h-pad.b-12,'end')+stencil('DOGS',pad.l+12,h-pad.b-12,'start');
+  const maxN=Math.max(...items.map(i=>i.net))||1;
+  items.forEach(it=>{
+    const r=4+10*Math.sqrt(it.net/maxN);
+    g+='<circle cx="'+X(it.x)+'" cy="'+Y(it.y)+'" r="'+r.toFixed(1)+'" fill="'+(QC[it.quad]||C.steel)+'" fill-opacity=".62" stroke="'+(QC[it.quad]||C.steel)+'" stroke-width="1.2"><title>'+esc(it.label)+'\nQty '+NUM(it.qty)+' · '+PKR(it.net)+' · '+it.quad+'</title></circle>';
+  });
+  g+='<text x="'+(w/2)+'" y="'+(h-10)+'" font-size="10.5" fill="'+C.steel+'" text-anchor="middle">POPULARITY  →  units sold</text>';
+  g+='<text x="14" y="'+(h/2)+'" font-size="10.5" fill="'+C.steel+'" text-anchor="middle" transform="rotate(-90 14 '+(h/2)+')">PROFITABILITY  →  margin per unit</text>';
+  return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:auto">'+g+'</svg>';
+}
+
+/* =====================================================================
+   APP STATE + SHELL
+   ===================================================================== */
+const APP = {months:[], cur:null, cmp:null, basis:'raw', costs:{}, targets:{}, plan:{}, sort:{}};
+const PAGES = [
+  ['upload','Files'],['overview','Overview'],['movers','Movers'],['pizza','Pizza mix'],
+  ['menu','Menu engineering'],['trends','Trends'],['coach','Coaching'],['kpis','All 50 KPIs'],
+  ['data','Data table'],['setup','Setup']
+];
+let PAGE='upload';
+
+function buildNav(){
+  $('#nav').innerHTML = PAGES.map((p,i)=>
+    '<button data-p="'+p[0]+'" class="'+(p[0]===PAGE?'on':'')+'"><span class="idx">'+String(i+1).padStart(2,'0')+'</span>'+p[1]+'</button>').join('');
+  $$('#nav button').forEach(b=> b.onclick=()=>go(b.dataset.p));
+}
+function closeRail(){ $('.rail').classList.remove('open'); $('#scrim').classList.remove('open'); }
+function go(id){
+  PAGE=id;
+  $$('.page').forEach(s=>s.classList.remove('on'));
+  $('#p-'+id).classList.add('on');
+  $$('#nav button').forEach(b=>b.classList.toggle('on', b.dataset.p===id));
+  const lbl=(PAGES.find(x=>x[0]===id)||['',''])[1];
+  if($('#nowPage')) $('#nowPage').textContent=lbl;
+  closeRail(); window.scrollTo(0,0);
+  render();
+}
+function M(){ return APP.months.find(m=>m.id===APP.cur) || null; }
+function P(){ return APP.months.find(m=>m.id===APP.cmp) || null; }
+function buildListPrices(){
+  const lp={};
+  for(const m of APP.months){
+    for(const r of m.rows){
+      if(!isFood(r)) continue;
+      const k=[r.item,r.size,r.crust].filter(Boolean).join(' · ');
+      if(!lp[k] || r.unit>lp[k]) lp[k]=r.unit;
+    }
+  }
+  window.__listPrice=lp;
+}
+function metrics(m){ return m? compute(m, APP.costs) : null; }
+function perDay(){ return APP.basis==='day'; }
+
+async function boot(){
+  buildNav();
+  APP.months  = (await store.get('pulse:months'))  || [];
+  APP.costs   = (await store.get('pulse:costs'))   || {};
+  APP.targets = (await store.get('pulse:targets')) || {};
+  APP.plan    = (await store.get('pulse:plan'))    || {};
+  APP.months.sort((a,b)=>a.id.localeCompare(b.id));
+  buildListPrices();
+  if(APP.months.length){ APP.cur = APP.months[APP.months.length-1].id; APP.cmp = APP.months.length>1? APP.months[APP.months.length-2].id : ''; }
+  if(APP.months.length) go('overview'); else render();
+}
+async function saveMonths(){ APP.months.sort((a,b)=>a.id.localeCompare(b.id)); buildListPrices(); await store.set('pulse:months', APP.months); }
+
+function refreshStrip(){
+  const strip=$('#strip');
+  if(!APP.months.length){ strip.hidden=true; return; }
+  strip.hidden = (PAGE==='upload'||PAGE==='setup');
+  $('#mSel').innerHTML = APP.months.map(m=>'<option value="'+m.id+'"'+(m.id===APP.cur?' selected':'')+'>'+esc(m.label)+'</option>').join('');
+  const others = APP.months.filter(m=>m.id!==APP.cur);
+  $('#cSel').innerHTML = '<option value="">No comparison</option>'
+    + (prevMonthId()? '<option value="'+prevMonthId()+'"'+(APP.cmp===prevMonthId()?' selected':'')+'>Previous month</option>':'')
+    + others.map(m=>'<option value="'+m.id+'"'+(m.id===APP.cmp?' selected':'')+'>'+esc(m.label)+'</option>').join('');
+  const m=M();
+  $('#stripMeta').innerHTML = m? esc(m.store||'Store')+'<br>'+esc(m.begin)+' → '+esc(m.end)+' · '+m.days+' days · '+NUM(m.rows.length)+' rows' : '';
+  $$('#basis button').forEach(b=>b.classList.toggle('on', b.dataset.b===APP.basis));
+}
+function prevMonthId(){
+  const i = APP.months.findIndex(m=>m.id===APP.cur);
+  return i>0? APP.months[i-1].id : '';
+}
+
+/* =====================================================================
+   PAGE: FILES
+   ===================================================================== */
+function pageUpload(){
+  const list = APP.months.length ? `
+    <div class="tw" style="max-height:none">
+      <table><thead><tr><th>Month</th><th>Period</th><th class="r">Days</th><th class="r">Rows</th>
+      <th class="r">Net sales</th><th class="r">Orders</th><th>Health</th><th>File</th><th></th></tr></thead><tbody>
+      ${APP.months.map(m=>{ const mm=metrics(m); return `<tr>
+        <td><b>${esc(m.label)}</b></td><td class="mono">${esc(m.begin)} → ${esc(m.end)}</td>
+        <td class="r mono">${m.days}</td><td class="r mono">${NUM(m.rows.length)}</td>
+        <td class="r mono">${PKR(mm.sales)}</td><td class="r mono">${NUM(mm.orders)}</td>
+        <td>${m.warnings.length? '<span class="tag t-dog">'+m.warnings.length+' warnings</span>':'<span class="tag t-star">clean</span>'}</td>
+        <td class="mono" style="color:var(--mute)">${esc(m.file||'')}</td>
+        <td class="r"><button class="btn ghost sm" data-del="${m.id}">Remove</button></td></tr>`;}).join('')}
+      </tbody></table>
+    </div>` : '';
+
+  const warns = APP.months.flatMap(m=>m.warnings.map(w=>({m:m.label,w}))).slice(0,12);
+
+  $('#p-upload').innerHTML = `
+    <div style="padding-top:26px">
+      <div class="eyebrow">Step one</div>
+      <h1>Load your Pulse product-mix reports</h1>
+      <p class="lede">Drop one PDF per month. Upload several months and every screen gains a
+      month-on-month comparison. Files are read in this browser — nothing is sent anywhere.</p>
+
+      <div class="drop" id="drop">
+        <div class="big">Drop PDFs here</div>
+        <div class="sm">or <a href="#" id="pick">choose files</a> · Pulse v3.9 Product Mix export</div>
+        <input type="file" id="file" accept="application/pdf" multiple hidden>
+        <div id="prog" class="mini" style="margin-top:14px"></div>
+      </div>
+
+      ${list? '<h2 style="margin:26px 0 10px">Month library</h2>'+list : ''}
+      ${warns.length? '<div class="note" style="margin-top:14px"><b>Parse warnings</b><br>'+warns.map(x=>esc(x.m)+': '+esc(x.w)).join('<br>')+'</div>':''}
+      ${APP.months.length? '<div class="row" style="margin-top:16px"><button class="btn red" id="goOv">Open dashboard</button></div>':''}
+    </div>`;
+
+  const drop=$('#drop'), inp=$('#file');
+  $('#pick').onclick=e=>{e.preventDefault();inp.click()};
+  drop.onclick=e=>{ if(e.target===drop||e.target.classList.contains('big')) inp.click(); };
+  inp.onchange=()=>ingest(inp.files);
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('hot')}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('hot')}));
+  drop.addEventListener('drop',e=>ingest(e.dataTransfer.files));
+  $$('[data-del]').forEach(b=> b.onclick=async()=>{
+    APP.months = APP.months.filter(m=>m.id!==b.dataset.del);
+    if(APP.cur===b.dataset.del) APP.cur = APP.months.length? APP.months[APP.months.length-1].id : null;
+    await saveMonths(); render(); toast('Month removed.');
+  });
+  if($('#goOv')) $('#goOv').onclick=()=>go('overview');
+}
+
+async function ingest(files){
+  const fs=Array.from(files||[]).filter(f=>/pdf$/i.test(f.name));
+  if(!fs.length){ toast('Only PDF files can be read.'); return; }
+  const prog=$('#prog');
+  for(const f of fs){
+    prog.innerHTML='<span class="spin" style="border-color:rgba(0,0,0,.15);border-top-color:#151A21"></span> Reading '+esc(f.name)+'…';
+    try{
+      const m = await parsePDF(f,(p,t)=> prog.textContent='Reading '+f.name+' — page '+p+' of '+t);
+      const i = APP.months.findIndex(x=>x.id===m.id);
+      if(i>=0){ APP.months[i]=m; toast('Replaced '+esc(m.label)+' — '+NUM(m.rows.length)+' rows.'); }
+      else { APP.months.push(m); toast('Added '+esc(m.label)+' — '+NUM(m.rows.length)+' rows, '+PKR(sum(m.rows.filter(isFood),r=>r.net))+'.'); }
+      APP.cur=m.id; APP.cmp=prevMonthId();
+    }catch(err){
+      prog.innerHTML=''; 
+      $('#p-upload').insertAdjacentHTML('beforeend','<div class="warn" style="margin-top:14px"><b>'+esc(f.name)+' could not be read.</b><br>'+esc(err.message)+'</div>');
+      continue;
+    }
+  }
+  prog.textContent='';
+  await saveMonths(); render();
+}
+
+/* =====================================================================
+   PAGE: OVERVIEW  (KPI 1–6, 15–18, 25–30, 31–34)
+   ===================================================================== */
+function tile(n,label,value,d,prevLabel,fmt){
+  const cls = d? dg(d.pct):'flat';
+  return `<div class="kpi"><span class="n">${n}</span><div class="k">${esc(label)}</div>
+    <div class="v num">${value}</div>
+    ${d? `<div class="d ${cls}"><span>${arrow(d.pct)} ${(d.pct*100).toFixed(1)}%</span>
+      <span class="prev">${prevLabel||''} ${fmt?fmt(d.b):''}</span></div>`
+       : '<div class="d flat"><span class="prev">no comparison</span></div>'}</div>`;
+}
+function pageOverview(){
+  const m=M(); if(!m){ $('#p-overview').innerHTML=empty(); return; }
+  const c=metrics(m), p=metrics(P()), pd=perDay(), div=pd?c.days:1, pdiv=(pd&&P())?P().days:1;
+  const D=(k,f)=>{ if(!p) return null; const a=c[k]/(f?div:1), b=p[k]/(f?pdiv:1); return b?{abs:a-b,pct:(a-b)/Math.abs(b),a,b}:null; };
+  const pl = P()? P().label : '';
+
+  // growth decomposition (KPI 33)
+  let decomp='';
+  if(p){
+    const dO=c.orders-p.orders, dA=c.aov-p.aov;
+    const fromOrders=dO*p.aov, fromAov=dA*c.orders;
+    decomp = `<div class="card"><h3>Where the change came from</h3>
+      <div class="cap">KPI 33 · sales change split into traffic vs basket size</div>
+      ${barChart([
+        {key:'More / fewer orders', value:Math.abs(fromOrders), color:fromOrders>=0?C.moss:C.flame},
+        {key:'Bigger / smaller basket', value:Math.abs(fromAov), color:fromAov>=0?C.moss:C.flame}
+      ],{fmt:PKR})}
+      <p class="summary" style="margin-top:10px">Orders moved <b>${NUM(dO)}</b> (${PKR(fromOrders)} effect) and average
+      order value moved <b>${PKR(dA)}</b> (${PKR(fromAov)} effect). ${
+        Math.abs(fromOrders)>Math.abs(fromAov)
+        ? 'The swing is mostly <b>traffic</b> — marketing, delivery reach and aggregator visibility are the levers.'
+        : 'The swing is mostly <b>basket size</b> — upselling, attach rate and pricing are the levers.'}</p></div>`;
+  }
+
+  const catRows = c.byCat.map(x=>{
+    const pc = p? p.byCat.find(y=>y.key===x.key) : null;
+    return {...x, dShare: pc? x.revShare-pc.revShare : null, dNet: pc? x.net-pc.net : null};
+  });
+
+  $('#p-overview').innerHTML = `
+    <div class="eyebrow">${esc(m.label)}${pd?' · per day':''}</div>
+    <h1>Overview</h1>
+    <p class="lede">Headline trading numbers, category contribution and the attach rates that decide basket size.
+    Every tile compares against ${pl? '<b>'+esc(pl)+'</b>':'nothing yet — load another month'}.</p>
+
+    <div class="row" style="margin-bottom:16px">
+      <button class="btn red" id="dlNumbers">Download numbers (PDF)</button>
+      <button class="btn ghost" id="dlCsvAll">Export rows (CSV)</button>
+    </div>
+
+    <div class="grid g6" style="margin-bottom:18px">
+      ${tile(1,'Net food sales', pd?PKR(c.sales/div):PKRk(c.sales), D('sales',true), pl, PKRk)}
+      ${tile(2,'Units sold', NUM(c.units/div), D('units',true), pl, NUM)}
+      ${tile(3,'Orders', NUM(c.orders/div), D('orders',true), pl, NUM)}
+      ${tile(4,'Average order value', PKR(c.aov), D('aov'), pl, PKR)}
+      ${tile(5,'Units per order', c.upo.toFixed(2), D('upo'), pl, x=>x.toFixed(2))}
+      ${tile(6,'Average item price', PKR(c.asp), D('asp'), pl, PKR)}
+    </div>
+
+    <div class="grid g2">
+      <div class="card"><h3>Category contribution</h3><div class="cap">KPI 15–16 · share of net sales</div>
+        ${donut(c.byCat.slice(0,9).map(x=>({key:x.key,value:x.net})))}</div>
+      <div class="card"><h3>Ticket, units and attach by category</h3><div class="cap">KPI 16–18 · revenue share against unit share tells you which categories are cheap volume</div>
+        <div class="tw" style="max-height:300px"><table><thead><tr><th>Category</th><th class="r">Net</th><th class="r">Rev share</th>
+          <th class="r">Unit share</th><th class="r">Orders</th><th class="r">Ticket</th></tr></thead><tbody>
+        ${catRows.map(x=>`<tr><td>${esc(x.key)}</td><td class="r mono">${PKRk(x.net)}</td><td class="r mono">${PCT(x.revShare)}</td>
+          <td class="r mono">${PCT(x.qtyShare)}</td><td class="r mono">${NUM(x.orders)}</td>
+          <td class="r mono">${PKR(x.ticket)}</td></tr>`).join('')}
+        </tbody></table></div></div>
+    </div>
+
+    ${decomp}
+
+    <div class="card"><h3>Mix shift heatmap</h3>
+      <div class="cap">KPI 34 · percentage points of sales share gained or lost against ${esc(pl||'—')}</div>
+      ${p? `<div class="heat">${catRows.filter(x=>x.dShare!=null).sort((a,b)=>b.dShare-a.dShare).map(x=>{
+          const v=x.dShare, i=clamp(Math.abs(v)/0.04,0,1);
+          const bg = v>=0? 'rgba(46,125,79,'+(0.10+i*0.72).toFixed(2)+')' : 'rgba(200,16,46,'+(0.10+i*0.72).toFixed(2)+')';
+          const fg = i>0.55? '#fff':'var(--ink)';
+          return `<div class="hc" style="background:${bg};color:${fg}"><span class="hk">${esc(x.key)}</span>
+            <span class="hv">${PP(v)}</span><span class="hn">${PKR(x.dNet)}</span></div>`;}).join('')}</div>
+        <p class="summary" style="margin-top:12px">Share moving toward a category means customers traded into it.
+        A category can gain share while losing money if the whole month shrank, so read the PKR figure underneath.</p>`
+        : '<p class="mini">Load a second month to see where the mix moved.</p>'}
+    </div>
+
+    <div class="card"><h3>Add-on affinity</h3>
+      <div class="cap">KPI 49 · how often each add-on group rides along, indexed against total orders</div>
+      <div class="tw"><table><thead><tr><th>Main group</th><th class="r">Its orders</th><th class="r">Share of all orders</th>
+        <th class="r">Sides</th><th class="r">Drinks</th><th class="r">Desserts</th><th class="r">Dips</th></tr></thead><tbody>
+        ${c.cooc.map(x=>`<tr><td>${esc(x.main)}</td><td class="r mono">${NUM(x.orders)}</td><td class="r mono">${PCT(x.share)}</td>
+          <td class="r mono">${PCT(x.sides)}</td><td class="r mono">${PCT(x.drink)}</td>
+          <td class="r mono">${PCT(x.dess)}</td><td class="r mono">${PCT(x.dip)}</td></tr>`).join('')}
+      </tbody></table></div>
+      <p class="mini" style="margin-top:8px">Pulse reports items, not baskets, so add-on columns are store-wide rates rather than true
+      per-basket pairing. Use them to compare months, not to claim a specific pizza sells a specific dip.</p></div>
+
+    <div class="card"><h3>Attach rates</h3>
+      <div class="cap">KPI 25–28, 47 · counts an order twice if it contains two items from the same group, so read the trend more than the level</div>
+      <div class="grid g4">
+        ${tile(25,'Sides attach', PCT(c.atSides), p?{pct:(c.atSides-p.atSides)/p.atSides,b:p.atSides}:null, pl, PCT)}
+        ${tile(26,'Dessert attach', PCT(c.atDess), p?{pct:(c.atDess-p.atDess)/p.atDess,b:p.atDess}:null, pl, PCT)}
+        ${tile(27,'Drinks attach', PCT(c.atDrink), p?{pct:(c.atDrink-p.atDrink)/p.atDrink,b:p.atDrink}:null, pl, PCT)}
+        ${tile(28,'Dip attach', PCT(c.atDip), p?{pct:(c.atDip-p.atDip)/p.atDip,b:p.atDip}:null, pl, PCT)}
+      </div>
+      <div class="grid g4" style="margin-top:14px">
+        ${tile(46,'Items per order', c.upo.toFixed(2), p?{pct:(c.upo-p.upo)/p.upo,b:p.upo}:null, pl, x=>x.toFixed(2))}
+        ${tile(47,'Add-on units per order', c.addonPerOrder.toFixed(2), p?{pct:(c.addonPerOrder-p.addonPerOrder)/(p.addonPerOrder||1),b:p.addonPerOrder}:null, pl, x=>x.toFixed(2))}
+        ${tile(48,'Combo / MyBox penetration', PCT(c.comboPen), p?{pct:(c.comboPen-p.comboPen)/(p.comboPen||1),b:p.comboPen}:null, pl, PCT)}
+        ${tile(49,'Pizza share of units', PCT(c.pizzaQty/c.units), null)}
+      </div>
+      <hr class="h">
+      <h3 style="font-size:14px">Dip preference</h3>
+      ${barChart(c.dips.slice(0,8).map(d=>({key:d.key,value:d.qty})),{fmt:NUM,color:C.tape})}
+    </div>
+
+    <div class="card"><h3>Channel</h3><div class="cap">KPI 29–30 · delivery reach and aggregator cost</div>
+      <div class="grid g4">
+        ${tile(29,'Delivery penetration', PCT(c.deliveryPen), p?{pct:(c.deliveryPen-p.deliveryPen)/p.deliveryPen,b:p.deliveryPen}:null, pl, PCT)}
+        ${tile(29,'Aggregator share of orders', PCT(c.aggPen), p?{pct:(c.aggPen-p.aggPen)/(p.aggPen||1),b:p.aggPen}:null, pl, PCT)}
+        ${tile(30,'Aggregator fees paid', PKRk(c.aggFees), p?{pct:(c.aggFees-p.aggFees)/(p.aggFees||1),b:p.aggFees}:null, pl, PKRk)}
+        ${tile(30,'Fee leakage vs sales', PCT(c.feeLeak,2), p?{pct:(c.feeLeak-p.feeLeak)/(p.feeLeak||1),b:p.feeLeak}:null, pl, x=>PCT(x,2))}
+      </div>
+    </div>`;
+  $('#dlNumbers').onclick=exportNumbersPDF;
+  $('#dlCsvAll').onclick=()=>exportCSV();
+}
+function empty(){ return '<div class="empty"><div class="big">No month loaded</div><p>Go to <b>Files</b> and drop a Pulse Product Mix PDF.</p><button class="btn red" onclick="go(\'upload\')">Load a file</button></div>'; }
+</script>
+
+
+<script>
+/* =====================================================================
+   PAGE: MOVERS  (KPI 7–14, 35–40, 50)
+   ===================================================================== */
+function pageMovers(){
+  const m=M(); if(!m){ $('#p-movers').innerHTML=empty(); return; }
+  const c=metrics(m), p=metrics(P()), pl=P()?P().label:'';
+  const prevMap = p? new Map(p.sku.map(s=>[s.key,s])) : new Map();
+  const curMap  = new Map(c.sku.map(s=>[s.key,s]));
+
+  const moves = c.sku.map(s=>{ const q=prevMap.get(s.key); return {...s, prevNet:q?q.net:0, dNet:s.net-(q?q.net:0), isNew:p&&!q}; });
+  const gainers  = [...moves].sort((a,b)=>b.dNet-a.dNet).slice(0,10);
+  const decliners= [...moves].sort((a,b)=>a.dNet-b.dNet).slice(0,10);
+  const lost     = p? p.sku.filter(s=>!curMap.has(s.key)) : [];
+  const churn    = p? (moves.filter(x=>x.isNew).length + lost.length)/c.skuCount : null;
+
+  const tbl=(rows,cols)=>`<div class="tw"><table><thead><tr>${cols.map(x=>'<th class="'+(x[2]||'')+'">'+x[0]+'</th>').join('')}</tr></thead>
+    <tbody>${rows.map(r=>'<tr>'+cols.map(x=>'<td class="'+(x[2]?'r mono':'')+'">'+x[1](r)+'</td>').join('')+'</tr>').join('')}</tbody></table></div>`;
+
+  $('#p-movers').innerHTML=`
+    <div class="eyebrow">${esc(m.label)}</div><h1>Movers</h1>
+    <p class="lede">What sells, what does not, and what changed since ${pl? '<b>'+esc(pl)+'</b>':'the previous month (not loaded)'}.</p>
+
+    <div class="grid g4" style="margin-bottom:18px">
+      ${tile(11,'Items making 80% of sales', NUM(c.p80)+' of '+NUM(c.skuCount), null)}
+      ${tile(12,'Long-tail items (under 1% each)', PCT(c.longTail,0), null)}
+      ${tile(13,'Revenue per item', PKR(c.revPerSku), null)}
+      ${tile(50,'Top 5 items = share of sales', PCT(c.top5Conc), null)}
+    </div>
+
+    <div class="grid g2">
+      <div class="card"><h3>Top 20 by revenue</h3><div class="cap">KPI 7</div>
+        ${barChart(c.topRev.map(s=>({key:s.key,value:s.net})),{fmt:PKRk,color:C.navy})}</div>
+      <div class="card"><h3>Top 20 by units</h3><div class="cap">KPI 8</div>
+        ${barChart(c.topQty.map(s=>({key:s.key,value:s.qty})),{fmt:NUM,color:C.ink})}</div>
+    </div>
+
+    <div class="grid g2">
+      <div class="card"><h3>Top 10 gainers</h3><div class="cap">KPI 35 · absolute PKR won vs ${esc(pl||'—')}</div>
+        ${p? tbl(gainers,[['Item',r=>esc(r.key)],['Now',r=>PKR(r.net),'r'],['Then',r=>PKR(r.prevNet),'r'],['Δ',r=>'<span class="'+dg(r.dNet)+'">'+PKR(r.dNet)+'</span>','r']]) : '<p class="mini">Load a second month.</p>'}</div>
+      <div class="card"><h3>Top 10 decliners</h3><div class="cap">KPI 36</div>
+        ${p? tbl(decliners,[['Item',r=>esc(r.key)],['Now',r=>PKR(r.net),'r'],['Then',r=>PKR(r.prevNet),'r'],['Δ',r=>'<span class="'+dg(r.dNet)+'">'+PKR(r.dNet)+'</span>','r']]) : '<p class="mini">Load a second month.</p>'}</div>
+    </div>
+
+    <div class="grid g3">
+      <div class="card"><h3>New this month</h3><div class="cap">KPI 37</div>
+        ${p? (moves.filter(x=>x.isNew).length? tbl(moves.filter(x=>x.isNew).sort((a,b)=>b.net-a.net).slice(0,15),[['Item',r=>esc(r.key)],['Net',r=>PKR(r.net),'r'],['Qty',r=>NUM(r.qty),'r']]) : '<p class="mini">Nothing new.</p>') : '<p class="mini">Load a second month.</p>'}</div>
+      <div class="card"><h3>Stopped selling</h3><div class="cap">KPI 38 · sold last month, zero this month</div>
+        ${p? (lost.length? tbl(lost.sort((a,b)=>b.net-a.net).slice(0,15),[['Item',r=>esc(r.key)],['Was',r=>PKR(r.net),'r'],['Qty',r=>NUM(r.qty),'r']]) : '<p class="mini">Nothing dropped out.</p>') : '<p class="mini">Load a second month.</p>'}</div>
+      <div class="card"><h3>Menu churn</h3><div class="cap">KPI 39–40</div>
+        <div class="grid" style="gap:10px">
+        ${tile(39,'Menu velocity', PCT(c.velocity,0), null)}
+        ${tile(40,'SKU churn rate', churn==null?'—':PCT(churn,1), null)}</div></div>
+    </div>
+
+    <div class="card"><h3>Slow movers &amp; delist candidates</h3>
+      <div class="cap">KPI 9–10 · 5 units or fewer this month. ${NUM(c.dead.length)} items sold 2 or fewer.</div>
+      ${tbl(c.slow,[['Item',r=>esc(r.key)],['Category',r=>esc(r.cat)],['Qty',r=>NUM(r.qty),'r'],['Net',r=>PKR(r.net),'r'],['Unit price',r=>PKR(r.unit),'r']])}
+    </div>
+
+    <div class="card"><h3>Efficiency index</h3>
+      <div class="cap">KPI 14 · sales-mix share ÷ unit-mix share. Above 1.0 earns more than its volume suggests; below 1.0 is cheap filler.</div>
+      ${barChart([...c.sku].filter(s=>s.qty>=10).sort((a,b)=>b.eff-a.eff).slice(0,12).map(s=>({key:s.key,value:+s.eff.toFixed(2)})),{fmt:x=>x.toFixed(2)+'×',color:C.moss})}
+      <hr class="h">
+      ${barChart([...c.sku].filter(s=>s.qty>=10).sort((a,b)=>a.eff-b.eff).slice(0,8).map(s=>({key:s.key,value:+s.eff.toFixed(2)})),{fmt:x=>x.toFixed(2)+'×',color:C.flame})}
+    </div>`;
+}
+
+/* =====================================================================
+   PAGE: PIZZA  (KPI 19–24, 41–45)
+   ===================================================================== */
+function pagePizza(){
+  const m=M(); if(!m){ $('#p-pizza').innerHTML=empty(); return; }
+  const c=metrics(m), p=metrics(P()), pl=P()?P().label:'';
+  const sizePrice = c.bySize.map(s=>({key:s.key,value:Math.round(s.unit)}));
+  const drift = c.byCat.map(x=>{ const q=p?p.byCat.find(y=>y.key===x.key):null; return {key:x.key,cur:x.unit,prev:q?q.unit:null}; });
+
+  $('#p-pizza').innerHTML=`
+    <div class="eyebrow">${esc(m.label)}</div><h1>Pizza mix</h1>
+    <p class="lede">Size, crust and flavour are where a Domino's basket is won or lost. Every percentage point of crust
+    upgrade is margin you already have on the shelf.</p>
+
+    <div class="grid g4" style="margin-bottom:18px">
+      ${tile(21,'Premium crust penetration', PCT(c.premPen), p?{pct:(c.premPen-p.premPen)/(p.premPen||1),b:p.premPen}:null, pl, PCT)}
+      ${tile(24,'Pan dependency', PCT(c.panDep), p?{pct:(c.panDep-p.panDep)/(p.panDep||1),b:p.panDep}:null, pl, PCT)}
+      ${tile(45,'Premium crust uplift earned', PKRk(c.premUplift), null)}
+      ${tile(44,'Upsize opportunity (10% of medium)', PKRk(c.upsizeValue), null)}
+    </div>
+
+    <div class="grid g2">
+      <div class="card"><h3>Size mix</h3><div class="cap">KPI 19 · share of pizza units</div>
+        ${donut(c.bySize.map(s=>({key:s.key,value:s.qty})))}</div>
+      <div class="card"><h3>Crust mix</h3><div class="cap">KPI 20 · share of pizza units</div>
+        ${barChart(c.byCrust.map(x=>({key:x.key,value:x.qty,color:PREMIUM.indexOf(x.key)>=0?C.tape:C.navy})),{fmt:NUM})}
+        <div class="legend"><span><i style="background:${C.tape}"></i>Premium crust</span><span><i style="background:${C.navy}"></i>Standard</span></div></div>
+    </div>
+
+    <div class="grid g2">
+      <div class="card"><h3>Flavour leaderboard</h3><div class="cap">KPI 22 · all sizes and crusts rolled up</div>
+        ${barChart(c.byFlav.map(f=>({key:f.key,value:f.qty})),{fmt:NUM,color:C.flame})}</div>
+      <div class="card"><h3>Average price by size</h3><div class="cap">KPI 23</div>
+        ${barChart(sizePrice,{fmt:PKR,color:C.ink})}
+        <hr class="h">
+        <p class="summary">Medium Pan sells at <b>${PKR(c.medUnit)}</b>, Large Pan at <b>${PKR(c.lrgUnit)}</b>.
+        Every medium talked up to a large is worth <b>${PKR(c.upsizeDelta)}</b>.
+        You sold <b>${NUM(c.medQty)}</b> medium Pan pizzas — moving one in ten adds <b>${PKR(c.upsizeValue)}</b>.</p></div>
+    </div>
+
+    <div class="card"><h3>Price drift by category</h3>
+      <div class="cap">KPI 41–43 · a falling average price usually means discounting, not a price cut</div>
+      <div class="tw" style="max-height:330px"><table><thead><tr><th>Category</th><th class="r">Avg price now</th>
+        <th class="r">${esc(pl||'—')}</th><th class="r">Δ</th><th>Read</th></tr></thead><tbody>
+        ${drift.map(d=>{ const dd=d.prev? (d.cur-d.prev)/d.prev : null;
+          return `<tr><td>${esc(d.key)}</td><td class="r mono">${PKR(d.cur)}</td>
+          <td class="r mono">${d.prev==null?'—':PKR(d.prev)}</td>
+          <td class="r mono ${dd==null?'':dg(dd)}">${dd==null?'—':(dd*100).toFixed(1)+'%'}</td>
+          <td>${dd==null?'—':(dd<-0.10?'<span class="tag t-dog">discount leak</span>':(dd>0.10?'<span class="tag t-star">price up</span>':'<span class="tag t-plow">stable</span>'))}</td></tr>`}).join('')}
+      </tbody></table></div></div>
+
+    <div class="card"><h3>Price realization &amp; discount leakage</h3>
+      <div class="cap">KPI 42–43 · realized price against the best price this item has ever achieved across your loaded months.
+      Under 90% usually means discounting, a voucher channel, or a bundle absorbing the item.</div>
+      ${APP.months.length<2? '<div class="note" style="margin-bottom:12px">With one month loaded, list price is taken from this month itself, so nothing can show as leaking. Load more months and this becomes a real discount detector.</div>':''}
+      <div class="tw" style="max-height:340px"><table><thead><tr><th>Item</th><th class="r">Realized</th><th class="r">Best ever</th>
+        <th class="r">Realization</th><th class="r">Qty</th><th class="r">Value lost</th></tr></thead><tbody>
+      ${c.realization.slice(0,25).map(s=>`<tr><td>${esc(s.key)}</td><td class="r mono">${PKR(s.unit)}</td>
+        <td class="r mono">${PKR(s.list)}</td>
+        <td class="r mono ${s.real<0.9?'down':(s.real>=0.99?'up':'')}">${PCT(s.real,0)}</td>
+        <td class="r mono">${NUM(s.qty)}</td>
+        <td class="r mono">${s.real<1? PKR((s.list-s.unit)*s.qty):'—'}</td></tr>`).join('')}
+      </tbody></table></div>
+      ${c.leaks.length? '<div class="warn" style="margin-top:12px"><b>'+NUM(c.leaks.length)+' items realized under 90% of their best price.</b> Combined shortfall '+PKR(sum(c.leaks,s=>(s.list-s.unit)*s.qty))+' this month.</div>' : '<div class="ok" style="margin-top:12px">No item is realizing under 90% of its best price.</div>'}
+    </div>
+
+    <div class="card"><h3>Crust detail</h3><div class="cap">KPI 20–21 · units, revenue and average price per crust</div>
+      <div class="tw"><table><thead><tr><th>Crust</th><th class="r">Units</th><th class="r">Share</th><th class="r">Net</th><th class="r">Avg price</th><th class="r">vs Pan</th></tr></thead><tbody>
+      ${c.byCrust.map(x=>`<tr><td>${esc(x.key)} ${PREMIUM.indexOf(x.key)>=0?'<span class="tag t-star">premium</span>':''}</td>
+        <td class="r mono">${NUM(x.qty)}</td><td class="r mono">${PCT(x.share)}</td><td class="r mono">${PKRk(x.net)}</td>
+        <td class="r mono">${PKR(x.unit)}</td><td class="r mono ${dg(x.unit-c.panUnit)}">${(x.unit-c.panUnit>=0?'+':'')+PKR(x.unit-c.panUnit).replace('PKR ','')}</td></tr>`).join('')}
+      </tbody></table></div></div>`;
+}
+
+/* =====================================================================
+   PAGE: MENU ENGINEERING
+   ===================================================================== */
+function pageMenu(){
+  const m=M(); if(!m){ $('#p-menu').innerHTML=empty(); return; }
+  const c=metrics(m), p=metrics(P()), pl=P()?P().label:'';
+  const pts = c.sku.filter(s=>s.qty>=3).map(s=>({x:s.qty,y:s.margin,net:s.net,qty:s.qty,quad:s.quad,label:s.key}));
+  const prevQ = p? new Map(p.sku.map(s=>[s.key,s.quad])) : new Map();
+  const migrated = p? c.sku.filter(s=>prevQ.has(s.key) && prevQ.get(s.key)!==s.quad)
+      .map(s=>({...s, from:prevQ.get(s.key)})).sort((a,b)=>b.net-a.net) : [];
+  const rank = {Star:3,'Plow-horse':2,Puzzle:1,Dog:0};
+  const board = [...c.sku].sort((a,b)=> (rank[b.quad]-rank[a.quad]) || (b.net-a.net));
+  const dogs = c.quads.Dog.filter(s=>s.qty<=8).sort((a,b)=>a.net-b.net).slice(0,20);
+  const bundleA = c.quads['Plow-horse'].sort((a,b)=>b.qty-a.qty).slice(0,4);
+  const bundleB = c.quads.Puzzle.sort((a,b)=>b.margin-a.margin).slice(0,4);
+
+  const qCard = (name,cls,advice) => {
+    const list=c.quads[name];
+    return `<div class="card"><h3><span class="tag ${cls}">${name}</span> · ${NUM(list.length)} items</h3>
+      <div class="cap">${PKRk(sum(list,s=>s.net))} of sales · ${PCT(sum(list,s=>s.net)/c.sales)} of the month</div>
+      <p class="summary" style="font-size:13px;margin-bottom:10px">${advice}</p>
+      <div class="tw" style="max-height:230px"><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Net</th><th class="r">Margin/unit</th></tr></thead><tbody>
+      ${list.sort((a,b)=>b.net-a.net).slice(0,25).map(s=>`<tr><td>${esc(s.key)}</td><td class="r mono">${NUM(s.qty)}</td>
+        <td class="r mono">${PKR(s.net)}</td><td class="r mono">${PKR(s.margin)}</td></tr>`).join('')}
+      </tbody></table></div></div>`;
+  };
+
+  $('#p-menu').innerHTML=`
+    <div class="eyebrow">${esc(m.label)}</div><h1>Menu engineering</h1>
+    <p class="lede">Every item is placed by how much it sells against how much it earns per unit.
+    ${c.hasCosts? 'Margins here use the food costs you entered.'
+      : 'No food costs entered yet, so profitability is a price proxy — item price against its own category average. Add costs in <b>Setup</b> for real margins.'}</p>
+
+    ${!c.hasCosts? '<div class="note" style="margin-bottom:18px"><b>Add food costs to unlock real margin.</b> Enter a cost for your top 30 items in Setup and this whole page recalculates on contribution margin instead of price.</div>':''}
+
+    <div class="grid g4" style="margin-bottom:18px">
+      ${tile('D','Menu health score', c.health.score+' / 100', null)}
+      ${tile('D','Star revenue share', PCT(c.starShare), p?{pct:(c.starShare-p.starShare)/(p.starShare||1),b:p.starShare}:null, pl, PCT)}
+      ${tile('D','Dog count', NUM(c.quads.Dog.length), p?{pct:(c.quads.Dog.length-p.quads.Dog.length)/(p.quads.Dog.length||1),b:p.quads.Dog.length}:null, pl, NUM)}
+      ${tile('D','Total contribution', c.hasCosts? PKRk(c.contribTotal):'add costs', null)}
+    </div>
+
+    <div class="card"><h3>The matrix</h3>
+      <div class="cap">Bubble size is revenue. Hover any bubble for the item. ${NUM(pts.length)} items with 3+ units shown.</div>
+      ${scatterMatrix(pts)}
+      <div class="legend"><span><i style="background:#C79A00"></i>Star — keep, feature, protect price</span>
+        <span><i style="background:${C.navy}"></i>Plow-horse — popular but cheap; bundle it up</span>
+        <span><i style="background:#6B4E9E"></i>Puzzle — earns well, nobody orders it; promote or reposition</span>
+        <span><i style="background:${C.flame}"></i>Dog — low volume, low earn; cut</span></div>
+    </div>
+
+    <div class="card"><h3>Menu health score — ${c.health.score}/100</h3>
+      <div class="cap">Six sub-scores. The lowest bar is the one worth fixing first.</div>
+      ${barChart(c.health.parts.map(x=>({key:x.k,value:Math.round(x.v*100),color:x.v<0.5?C.flame:(x.v<0.75?C.tape:C.moss)})),{fmt:x=>x+'/100'})}
+      <hr class="h">
+      <p class="summary">Weakest area: <b>${esc(c.health.parts.slice().sort((a,b)=>a.v-b.v)[0].k)}</b> —
+      ${esc(c.health.parts.slice().sort((a,b)=>a.v-b.v)[0].hint.toLowerCase())}.</p></div>
+
+    <div class="grid g2">
+      ${qCard('Star','t-star','Protect these. Never discount them, keep them top-right on the menu board, and build every combo around them.')}
+      ${qCard('Plow-horse','t-plow','High traffic, thin earn. Raise price carefully or attach a dip, drink or dessert to every one that goes out.')}
+    </div>
+    <div class="grid g2">
+      ${qCard('Puzzle','t-puz','Good money, no takers. Move them onto the board, name them in upsell scripts, or make them a limited offer.')}
+      ${qCard('Dog','t-dog','Cut them. Each one costs prep space, stock lines and menu attention for almost nothing back.')}
+    </div>
+
+    ${(()=>{ if(!c.hasCosts) return '';
+      const proxy = compute(M(), {});
+      const pm = new Map(proxy.sku.map(s=>[s.key,s.quad]));
+      const flips = c.sku.filter(s=>pm.get(s.key) && pm.get(s.key)!==s.quad).sort((a,b)=>b.net-a.net);
+      return `<div class="card"><h3>What real costs changed</h3>
+        <div class="cap">Items that sit in a different quadrant once true food cost replaces the price proxy — these are your mispriced lines</div>
+        ${flips.length? `<div class="tw" style="max-height:320px"><table><thead><tr><th>Item</th><th>On price alone</th><th>On real margin</th><th class="r">Margin/unit</th><th class="r">Contribution</th></tr></thead><tbody>
+          ${flips.slice(0,30).map(s=>`<tr><td>${esc(s.key)}</td><td><span class="tag ${qcls(pm.get(s.key))}">${pm.get(s.key)}</span></td>
+            <td><span class="tag ${qcls(s.quad)}">${s.quad}</span></td><td class="r mono">${PKR(s.margin)}</td>
+            <td class="r mono">${s.contrib!=null?PKR(s.contrib):'—'}</td></tr>`).join('')}
+        </tbody></table></div>
+        <p class="summary" style="margin-top:10px"><b>${NUM(flips.length)}</b> items move once real cost is applied. Anything that fell out of Star
+        is quietly expensive to make; anything that climbed into Star is earning more than the price tag suggests.</p>`
+        : '<p class="mini">No item changes quadrant — your prices track your costs closely.</p>'}</div>`; })()}
+
+    <div class="card"><h3>Quadrant migration</h3><div class="cap">Items that changed position since ${esc(pl||'—')}</div>
+      ${p? (migrated.length? `<div class="tw" style="max-height:340px"><table><thead><tr><th>Item</th><th>Was</th><th>Now</th><th class="r">Net</th><th>Read</th></tr></thead><tbody>
+        ${migrated.slice(0,30).map(s=>{ const up=rank[s.quad]>rank[s.from];
+          return `<tr><td>${esc(s.key)}</td><td><span class="tag ${qcls(s.from)}">${s.from}</span></td>
+          <td><span class="tag ${qcls(s.quad)}">${s.quad}</span></td><td class="r mono">${PKR(s.net)}</td>
+          <td class="${up?'up':'down'}">${up?'▲ improving':'▼ slipping'}</td></tr>`}).join('')}
+        </tbody></table></div>` : '<p class="mini">Nothing changed quadrant.</p>') : '<p class="mini">Load a second month to track migration.</p>'}</div>
+
+    <div class="grid g2">
+      <div class="card"><h3>Delist simulator</h3>
+        <div class="cap">Cut the worst dogs and assume some volume walks to a neighbouring item</div>
+        <div class="row" style="margin-bottom:10px">
+          <label class="mini">Cut the bottom <input type="number" id="dsN" value="10" min="1" max="${dogs.length||1}" style="width:64px"> dogs</label>
+          <label class="mini">Transfer rate <input type="number" id="dsT" value="40" min="0" max="100" style="width:64px">%</label>
+          <button class="btn ghost sm" id="dsRun">Model it</button>
+        </div>
+        <div id="dsOut"></div>
+      </div>
+      <div class="card"><h3>Bundle builder</h3>
+        <div class="cap">Pair a crowd-puller with a high-margin item that needs help</div>
+        ${bundleA.length&&bundleB.length? bundleA.slice(0,3).map((a,i)=>{
+          const b=bundleB[i%bundleB.length]; if(!b) return '';
+          const list=a.unit+b.unit, price=Math.round(list*0.88/10)*10, marg=(a.margin+b.margin)-(list-price);
+          return `<div class="script"><div class="sw">Bundle ${i+1}</div>
+            <b>${esc(a.item)}</b> + <b>${esc(b.item)}</b><br>
+            <span class="mono" style="font-size:12px">List ${PKR(list)} → bundle at <b>${PKR(price)}</b> (12% off) ·
+            blended margin ${PKR(marg)} · break-even attach ${PCT(Math.max(0.02,(list-price)/Math.max(1,a.margin+b.margin)),0)} of ${esc(a.item)} orders</span></div>`;
+        }).join('') : '<p class="mini">Not enough spread in the menu to suggest bundles.</p>'}
+      </div>
+    </div>
+
+    <div class="card"><h3>Menu board priority</h3>
+      <div class="cap">The eight that belong in the hot zone, and the ten to demote or remove</div>
+      <div class="grid g2">
+        <div><h4 class="eyebrow" style="color:var(--moss)">Promote — top right of the board</h4>
+          <div class="tw" style="max-height:270px"><table><thead><tr><th>#</th><th>Item</th><th class="r">Net</th><th>Type</th></tr></thead><tbody>
+          ${board.slice(0,8).map((s,i)=>`<tr><td class="mono">${i+1}</td><td>${esc(s.key)}</td><td class="r mono">${PKR(s.net)}</td><td><span class="tag ${qcls(s.quad)}">${s.quad}</span></td></tr>`).join('')}
+          </tbody></table></div></div>
+        <div><h4 class="eyebrow" style="color:var(--flame)">Demote or delete</h4>
+          <div class="tw" style="max-height:270px"><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Net</th></tr></thead><tbody>
+          ${board.slice(-10).reverse().map(s=>`<tr><td>${esc(s.key)}</td><td class="r mono">${NUM(s.qty)}</td><td class="r mono">${PKR(s.net)}</td></tr>`).join('')}
+          </tbody></table></div></div>
+      </div></div>`;
+
+  const run=()=>{
+    const n=clamp(+$('#dsN').value||10,1,dogs.length), t=clamp((+$('#dsT').value||40)/100,0,1);
+    const cut=dogs.slice(0,n), lostRev=sum(cut,s=>s.net), kept=lostRev*t;
+    $('#dsOut').innerHTML=`<div class="ok"><b>Cut ${n} items · lose ${PKR(lostRev)} · recover ${PKR(kept)} · net ${PKR(kept-lostRev)}</b><br>
+      That is ${PCT((lostRev-kept)/c.sales,2)} of the month's sales, in exchange for ${n} fewer stock lines and prep steps.</div>
+      <div class="tw" style="max-height:200px;margin-top:10px"><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Net</th></tr></thead><tbody>
+      ${cut.map(s=>`<tr><td>${esc(s.key)}</td><td class="r mono">${NUM(s.qty)}</td><td class="r mono">${PKR(s.net)}</td></tr>`).join('')}</tbody></table></div>`;
+  };
+  $('#dsRun').onclick=run; run();
+}
+function qcls(q){ return {'Star':'t-star','Plow-horse':'t-plow','Puzzle':'t-puz','Dog':'t-dog'}[q]||'t-plow'; }
+
+/* =====================================================================
+   PAGE: TRENDS  (KPI 31–34 across all months + anomalies)
+   ===================================================================== */
+function pageTrends(){
+  if(!APP.months.length){ $('#p-trends').innerHTML=empty(); return; }
+  const ms = APP.months, mets = ms.map(x=>compute(x,APP.costs));
+  const labels = ms.map(x=>x.label.replace(/(\w{3})\w*\s(\d{4})/,'$1 $2'));
+  const pd = perDay();
+  const V = k => mets.map((x,i)=> pd? x[k]/ms[i].days : x[k]);
+
+  // anomalies vs trailing average
+  const anomalies=[];
+  if(ms.length>=3){
+    const last=mets[mets.length-1];
+    const hist=mets.slice(0,-1);
+    for(const s of last.sku){
+      const prevVals = hist.map(h=>{const f=h.sku.find(y=>y.key===s.key); return f?f.qty:0;});
+      const base = prevVals.reduce((a,b)=>a+b,0)/prevVals.length;
+      if(base>=8){ const ch=(s.qty-base)/base; if(Math.abs(ch)>=0.30) anomalies.push({key:s.key,qty:s.qty,base:Math.round(base),ch,net:s.net}); }
+    }
+    anomalies.sort((a,b)=>Math.abs(b.ch*b.net)-Math.abs(a.ch*a.net));
+  }
+  // streaks
+  const streak=(dir)=>{
+    if(ms.length<3) return [];
+    const last=mets[mets.length-1];
+    return last.sku.filter(s=>{
+      const series = mets.map(h=>{const f=h.sku.find(y=>y.key===s.key); return f?f.qty:0;});
+      const t=series.slice(-3);
+      return dir>0 ? (t[0]<t[1]&&t[1]<t[2]&&t[2]>=10) : (t[0]>t[1]&&t[1]>t[2]&&t[0]>=10);
+    }).sort((a,b)=>b.net-a.net).slice(0,10);
+  };
+  const rising=streak(1), falling=streak(-1);
+
+  const catNames = [...new Set(mets.flatMap(x=>x.byCat.map(c=>c.key)))].slice(0,6);
+  const catSeries = catNames.map(n=>({name:n, values:mets.map((x,i)=>{const c=x.byCat.find(y=>y.key===n); const v=c?c.net:0; return pd? v/ms[i].days : v;})}));
+
+  const canni = pageTrendsCanni(mets);
+  const seasons = ms.map((x,i)=>({m:x, tags:seasonTags(x)})).filter(x=>x.tags.length);
+  const exec = (()=>{
+    if(mets.length<2) return 'One month loaded. Add the previous month and this paragraph writes itself: direction, cause, and the item doing the most damage or good.';
+    const a=mets[mets.length-1], b=mets[mets.length-2];
+    const la=ms[ms.length-1], lb=ms[ms.length-2];
+    const g=((a.sales/la.days)-(b.sales/lb.days))/(b.sales/lb.days);
+    const pm=new Map(b.sku.map(x=>[x.key,x]));
+    const mv=a.sku.map(x=>({k:x.key,d:x.net-((pm.get(x.key)||{}).net||0)}));
+    const best=[...mv].sort((x,y)=>y.d-x.d)[0], worst=[...mv].sort((x,y)=>x.d-y.d)[0];
+    const bestCat=a.byCat.map(x=>{const q=b.byCat.find(y=>y.key===x.key); return {k:x.key,d:x.revShare-(q?q.net/b.sales:0)}}).sort((x,y)=>y.d-x.d)[0];
+    return `Sales per day moved <b>${g>=0?'up':'down'} ${(Math.abs(g)*100).toFixed(1)}%</b> from ${esc(lb.label)} to ${esc(la.label)}, landing at ${PKR(a.sales)}.
+      Orders went ${a.orders>=b.orders?'up':'down'} <b>${NUM(Math.abs(a.orders-b.orders))}</b> and the basket went ${a.aov>=b.aov?'up':'down'} <b>${PKR(Math.abs(a.aov-b.aov))}</b>.
+      The mix drifted toward <b>${esc(bestCat.k)}</b> (${PP(bestCat.d)}). Biggest single gain: <b>${esc(best.k)}</b> at ${PKR(best.d)}.
+      Biggest single loss: <b>${esc(worst.k)}</b> at ${PKR(worst.d)}.
+      ${canni.length? 'There are <b>'+canni.length+'</b> signs of one variant eating another rather than new demand — see below.' : 'No sibling cannibalisation detected, so movement looks like real demand rather than customers switching variants.'}`;
+  })();
+
+  $('#p-trends').innerHTML=`
+    <div class="eyebrow">${ms.length} month${ms.length>1?'s':''} loaded${pd?' · per day':''}</div><h1>Trends</h1>
+    <p class="lede">${ms.length<2? 'Load at least two months to see a trend line. Everything below fills in automatically as you add files.'
+      : 'Month-on-month movement across sales, orders and basket size, plus the items swinging hardest against their own history.'}</p>
+
+    <div class="card"><h3>Executive summary</h3><div class="cap">Written from the loaded months, no input needed</div>
+      <p class="summary">${exec}</p></div>
+
+    <div class="grid g2">
+      <div class="card"><h3>Net food sales</h3><div class="cap">KPI 31</div>
+        ${lineChart([{name:'Net sales',values:V('sales'),color:C.flame}],labels,{fmt:PKRk})}</div>
+      <div class="card"><h3>Orders</h3><div class="cap">KPI 32</div>
+        ${lineChart([{name:'Orders',values:V('orders'),color:C.navy}],labels,{fmt:NUM})}</div>
+    </div>
+    <div class="grid g2">
+      <div class="card"><h3>Average order value</h3><div class="cap">KPI 33</div>
+        ${lineChart([{name:'AOV',values:mets.map(x=>x.aov),color:C.moss}],labels,{fmt:PKR})}</div>
+      <div class="card"><h3>Attach rates</h3><div class="cap">KPI 25–28 over time</div>
+        ${lineChart([
+          {name:'Sides',values:mets.map(x=>x.atSides*100)},
+          {name:'Drinks',values:mets.map(x=>x.atDrink*100)},
+          {name:'Desserts',values:mets.map(x=>x.atDess*100)},
+          {name:'Dips',values:mets.map(x=>x.atDip*100)}],labels,{fmt:x=>x.toFixed(0)+'%'})}</div>
+    </div>
+
+    <div class="card"><h3>Category trend</h3><div class="cap">KPI 34 · where the mix is drifting</div>
+      ${lineChart(catSeries,labels,{fmt:PKRk})}</div>
+
+    <div class="grid g3">
+      <div class="card"><h3>Rising</h3><div class="cap">Three months of gains</div>
+        ${rising.length? rising.map(s=>`<div style="padding:5px 0;border-bottom:1px solid var(--hair)"><b style="font-size:12.5px">${esc(s.key)}</b><br><span class="mono" style="font-size:11px;color:var(--moss)">${NUM(s.qty)} units · ${PKR(s.net)}</span></div>`).join('') : '<p class="mini">Needs three months.</p>'}</div>
+      <div class="card"><h3>Falling</h3><div class="cap">Three months of decline</div>
+        ${falling.length? falling.map(s=>`<div style="padding:5px 0;border-bottom:1px solid var(--hair)"><b style="font-size:12.5px">${esc(s.key)}</b><br><span class="mono" style="font-size:11px;color:var(--flame)">${NUM(s.qty)} units · ${PKR(s.net)}</span></div>`).join('') : '<p class="mini">Needs three months.</p>'}</div>
+      <div class="card"><h3>Anomalies</h3><div class="cap">Swinging over 30% against their own average</div>
+        ${anomalies.length? anomalies.slice(0,10).map(a=>`<div style="padding:5px 0;border-bottom:1px solid var(--hair)"><b style="font-size:12.5px">${esc(a.key)}</b><br>
+          <span class="mono ${dg(a.ch)}" style="font-size:11px">${arrow(a.ch)} ${(a.ch*100).toFixed(0)}% · ${NUM(a.qty)} vs ${NUM(a.base)} usual</span></div>`).join('') : '<p class="mini">Needs three months.</p>'}</div>
+    </div>
+
+    <div class="grid g2">
+      <div class="card"><h3>Cannibalisation watch</h3>
+        <div class="cap">One size or crust climbing while a sibling falls, with the family total flat — that is switching, not growth</div>
+        ${canni.length? canni.map(x=>`<div class="script" style="border-left-color:var(--tape)">
+            <div class="sw">${esc(x.item)} · family total ${NUM(x.total)} units, moved ${PCT(x.swing,1)}</div>
+            <span class="up mono" style="font-size:12px">▲ ${esc(x.up)} +${NUM(x.upD)}</span><br>
+            <span class="down mono" style="font-size:12px">▼ ${esc(x.down)} ${NUM(x.downD)}</span></div>`).join('')
+          : '<p class="mini">'+(mets.length<2?'Load a second month.':'Nothing detected — movement looks like real demand.')+'</p>'}</div>
+      <div class="card"><h3>Seasonality</h3>
+        <div class="cap">Trading events that land inside your loaded periods. Dates are approximate — moon sighting shifts them by a day or two.</div>
+        ${seasons.length? seasons.map(x=>`<div style="padding:8px 0;border-bottom:1px solid var(--hair)">
+            <b>${esc(x.m.label)}</b><br>${x.tags.map(t=>'<span class="tag t-plow" style="margin:4px 4px 0 0">'+esc(t.k)+'</span>').join('')}
+            <div class="mini" style="margin-top:5px">${x.tags.map(t=>esc(t.note)).join(' ')}</div></div>`).join('')
+          : '<p class="mini">No major trading event falls inside these periods.</p>'}
+        <p class="mini" style="margin-top:10px">When a month contains one of these, compare it against the same month last year rather than against last month.</p></div>
+    </div>
+
+    <div class="card"><h3>Month by month</h3><div class="cap">All loaded periods, normalised per day so short months are not punished</div>
+      <div class="tw"><table><thead><tr><th>Month</th><th class="r">Days</th><th class="r">Net sales</th><th class="r">Per day</th>
+        <th class="r">Orders</th><th class="r">AOV</th><th class="r">Units/order</th><th class="r">MoM</th><th class="r">Health</th></tr></thead><tbody>
+      ${mets.map((x,i)=>{ const prev=i? mets[i-1]:null;
+        const mom = prev? ((x.sales/ms[i].days)-(prev.sales/ms[i-1].days))/(prev.sales/ms[i-1].days) : null;
+        return `<tr><td><b>${esc(ms[i].label)}</b></td><td class="r mono">${ms[i].days}</td>
+          <td class="r mono">${PKR(x.sales)}</td><td class="r mono">${PKR(x.sales/ms[i].days)}</td>
+          <td class="r mono">${NUM(x.orders)}</td><td class="r mono">${PKR(x.aov)}</td>
+          <td class="r mono">${x.upo.toFixed(2)}</td>
+          <td class="r mono ${mom==null?'':dg(mom)}">${mom==null?'—':(mom>0?'+':'')+(mom*100).toFixed(1)+'%'}</td>
+          <td class="r mono">${x.health.score}</td></tr>`;}).join('')}
+      </tbody></table></div></div>`;
+}
+</script>
+
+
+<script>
+function pageTrendsCanni(mets){
+  if(mets.length<2) return [];
+  return cannibalisation(mets[mets.length-1], mets[mets.length-2]);
+}
+
+/* =====================================================================
+   COACHING ENGINE — gaps, levers, actions, target plan
+   ===================================================================== */
+const BENCH = {sides:0.30, dess:0.22, drink:0.55, dip:0.35, prem:0.22, single:0.18, feeLeak:0.02, upsizeShare:0.10};
+
+function gapList(c){
+  const O=c.orders, g=[];
+  const add=(name,note,now,target,value,lever)=>{ if(value>0) g.push({name,note,now,target,value,lever}); };
+  /* Targets are one month of coaching away, not a leap to best-in-class.
+     A five-point attach gain is a real month's work; a fifteen-point one is a fantasy. */
+  const step=(now,bench,inc)=> now>=bench ? now+inc/2 : Math.min(bench, now+inc);
+  const aim=(now,bench,inc)=> Math.max(0, step(now,bench,inc)-now);
+  add('Dessert attach','Every order without a dessert is the cheapest add-on you own',c.atDess,step(c.atDess,BENCH.dess,0.05),
+      aim(c.atDess,BENCH.dess,0.05)*O*c.avgDessPrice,'dess');
+  add('Sides attach','Fries, bread and wings ride on a pizza order at no extra delivery cost',c.atSides,step(c.atSides,BENCH.sides,0.05),
+      aim(c.atSides,BENCH.sides,0.05)*O*c.avgSidePrice,'sides');
+  add('Drinks attach','The highest-margin item on the menu and the easiest yes',c.atDrink,step(c.atDrink,BENCH.drink,0.05),
+      aim(c.atDrink,BENCH.drink,0.05)*O*c.avgDrinkPrice,'drink');
+  add('Dip attach','Small ticket, near-zero effort, and it lifts the taste score too',c.atDip,step(c.atDip,BENCH.dip,0.05),
+      aim(c.atDip,BENCH.dip,0.05)*O*c.avgDipPrice,'dip');
+  add('Upsize medium to large','One sentence at order-taking, no extra labour in the kitchen',0.0,BENCH.upsizeShare,c.upsizeValue,'upsize');
+  add('Premium crust penetration','Stuffed, New Yorker and Italian crusts carry a real price step',c.premPen,step(c.premPen,BENCH.prem,0.03),
+      aim(c.premPen,BENCH.prem,0.03)*c.pizzaQty*Math.max(0,c.premUnit-c.panUnit),'prem');
+  add('Cut the dead items','Not new money, but freed prep space, stock and menu attention',c.quads.Dog.length/Math.max(1,c.skuCount),0.05,
+      sum(c.quads.Dog.filter(s=>s.qty<=5),s=>s.net)*0.4,'delist');
+  if(c.feeLeak>BENCH.feeLeak)
+    add('Aggregator fee leakage','Push repeat customers to your own delivery line',c.feeLeak,BENCH.feeLeak,(c.feeLeak-BENCH.feeLeak)*c.sales,'fee');
+  return g.sort((a,b)=>b.value-a.value);
+}
+
+function actionsFrom(c,gaps,p){
+  const A=[];
+  const topFlav = c.byFlav[0]? c.byFlav[0].key : 'your best seller';
+  const topDip  = c.dips[0]? c.dips[0].key : 'Ranch Dip';
+  const g = k => gaps.find(x=>x.lever===k);
+  if(g('drink')) A.push({t:'Name a specific drink on every order',why:'Drinks attach is '+PCT(c.atDrink)+'. Asking "anything to drink?" gets a no; naming the bottle gets a yes.',
+    pkr:g('drink').value, who:'Order takers', how:'Drinks attach above '+PCT(g('drink').target)+' next month', eff:'Low',
+    assume:'Assumes 5 points of attach at the current average drink price of '+PKR(c.avgDrinkPrice)+'.'});
+  if(g('dess')) A.push({t:'Add the dessert line to every large-pizza order',why:'Dessert attach is '+PCT(c.atDess)+' while lava cake is already one of your strongest single items.',
+    pkr:g('dess').value, who:'Order takers · shift manager', how:'Dessert attach above '+PCT(g('dess').target), eff:'Low',
+    assume:'Assumes 5 points of attach at '+PKR(c.avgDessPrice)+' average dessert price.'});
+  if(g('upsize')) A.push({t:'Offer the large upgrade on every medium',why:'A medium Pan is '+PKR(c.medUnit)+' and a large is '+PKR(c.lrgUnit)+'. The gap is '+PKR(c.upsizeDelta)+' for the same oven time.',
+    pkr:g('upsize').value, who:'Order takers', how:'Large share of pizza units up 2 points', eff:'Low',
+    assume:'Assumes one in ten of your '+NUM(c.medQty)+' medium Pan orders moves up.'});
+  if(g('prem')) A.push({t:'Push one premium crust as the house recommendation',why:'Premium crust penetration is '+PCT(c.premPen)+'. Each upgraded pizza carries '+PKR(Math.max(0,c.premUnit-c.panUnit))+' more.',
+    pkr:g('prem').value, who:'Order takers · marketing', how:'Premium crust share above '+PCT(g('prem').target), eff:'Medium',
+    assume:'Assumes 3 points of pizza volume shifts onto a premium crust.'});
+  if(g('sides')) A.push({t:'Attach a side to every pizza-only order',why:'Sides attach is '+PCT(c.atSides)+' and the average order carries only '+c.addonPerOrder.toFixed(2)+' non-pizza items.',
+    pkr:g('sides').value, who:'Order takers', how:'Sides attach above '+PCT(g('sides').target), eff:'Low',
+    assume:'Assumes 5 points of attach at '+PKR(c.avgSidePrice)+' average side price.'});
+  if(g('delist')) A.push({t:'Remove the '+NUM(c.quads.Dog.filter(s=>s.qty<=5).length)+' items that barely sold',why:'They occupy stock lines, prep space and menu attention for '+PKR(sum(c.quads.Dog.filter(s=>s.qty<=5),s=>s.net))+' between them.',
+    pkr:g('delist').value, who:'Store manager', how:'SKU count down, waste down, no drop in total sales', eff:'Medium',
+    assume:'Assumes 40% of that volume moves to a neighbouring item.'});
+  if(g('fee')) A.push({t:'Move repeat aggregator customers to your own line',why:'Platform fees took '+PKR(c.aggFees)+' — '+PCT(c.feeLeak,2)+' of sales.',
+    pkr:g('fee').value, who:'Store manager · marketing', how:'Aggregator share of orders down 3 points', eff:'High',
+    assume:'Assumes fee leakage falls to 2% of sales.'});
+  if(p){
+    const decl = c.sku.map(s=>{const q=p.sku.find(y=>y.key===s.key); return {key:s.key, d:s.net-(q?q.net:0)}}).sort((a,b)=>a.d-b.d)[0];
+    if(decl && decl.d<0) A.push({t:'Find out what happened to '+decl.key,why:'It lost '+PKR(Math.abs(decl.d))+' against last month — the single biggest decline on the menu.',
+      pkr:Math.abs(decl.d)*0.5, who:'Store manager', how:'Item back within 20% of its previous level', eff:'Medium',
+      assume:'Assumes half the lost volume is recoverable once the cause is found.'});
+  }
+  return A.sort((a,b)=>b.pkr-a.pkr).slice(0,5);
+}
+
+function scriptsFrom(c){
+  const dip = c.dips[0]? c.dips[0].key.replace(/ Sauce| Dip/gi,'') : 'Ranch';
+  const dess= [...c.sku].filter(s=>CAT_DESS.indexOf(s.cat)>=0).sort((a,b)=>b.qty-a.qty)[0];
+  const side= [...c.sku].filter(s=>CAT_SIDES.indexOf(s.cat)>=0).sort((a,b)=>b.qty-a.qty)[0];
+  const drink=[...c.sku].filter(s=>CAT_DRINK.indexOf(s.cat)>=0).sort((a,b)=>b.qty-a.qty)[0];
+  const top5 = c.byFlav.slice(0,5);
+  return top5.map(f=>{
+    const bits=[];
+    if(dess) bits.push(dess.item+' for '+PKR(dess.unit));
+    if(side) bits.push(side.item+' for '+PKR(side.unit));
+    if(drink) bits.push('a '+drink.item+' for '+PKR(drink.unit));
+    return {item:f.key,
+      line:'"'+f.key+' — good choice. Make it a large for '+PKR(c.upsizeDelta)+' more? And a '+dip+' dip with it — most people having the '+f.key+' take one."',
+      follow:'"Before I close the order — '+(bits[0]||'a dessert')+'?"'};
+  });
+}
+
+/* target planner levers */
+function targetLevers(c){
+  const O=c.orders;
+  return [
+    {id:'orders', name:'Order growth',    unit:'%', max:20, step:1, def:0,
+     note:o=>'+'+o+'% orders · '+NUM(Math.round(O*o/100))+' more orders',
+     val:o=> O*(o/100)*c.aov},
+    {id:'drink', name:'Drinks attach',    unit:'pp', max:25, step:1, def:0,
+     note:o=>'+'+o+' points from '+PCT(c.atDrink), val:o=> O*(o/100)*c.avgDrinkPrice},
+    {id:'dess',  name:'Dessert attach',   unit:'pp', max:25, step:1, def:0,
+     note:o=>'+'+o+' points from '+PCT(c.atDess),  val:o=> O*(o/100)*c.avgDessPrice},
+    {id:'sides', name:'Sides attach',     unit:'pp', max:25, step:1, def:0,
+     note:o=>'+'+o+' points from '+PCT(c.atSides), val:o=> O*(o/100)*c.avgSidePrice},
+    {id:'dip',   name:'Dip attach',       unit:'pp', max:30, step:1, def:0,
+     note:o=>'+'+o+' points from '+PCT(c.atDip),   val:o=> O*(o/100)*c.avgDipPrice},
+    {id:'upsize',name:'Medium → large',   unit:'%', max:30, step:1, def:0,
+     note:o=>o+'% of '+NUM(c.medQty)+' mediums upsized', val:o=> c.medQty*(o/100)*c.upsizeDelta},
+    {id:'prem',  name:'Premium crust',    unit:'pp', max:20, step:1, def:0,
+     note:o=>'+'+o+' points from '+PCT(c.premPen),  val:o=> c.pizzaQty*(o/100)*Math.max(0,c.premUnit-c.panUnit)},
+    {id:'price', name:'Menu price rise',  unit:'%', max:10, step:1, def:0,
+     note:o=>'+'+o+'% across the board', val:o=> c.sales*(o/100)*0.9}
+  ];
+}
+
+/* =====================================================================
+   PAGE: COACHING
+   ===================================================================== */
+function pageCoach(){
+  const m=M(); if(!m){ $('#p-coach').innerHTML=empty(); return; }
+  const c=metrics(m), p=metrics(P()), pl=P()?P().label:'';
+  const gaps=gapList(c), acts=actionsFrom(c,gaps,p), scripts=scriptsFrom(c);
+  const maxGap = gaps.length? gaps[0].value : 1;
+  const totalOpp = sum(gaps,g=>g.value);
+  const tgt = APP.targets[m.id] || {};
+  const target = +tgt.value || 0;
+  const gapPkr = Math.max(0, target - c.sales);
+  const levers = targetLevers(c);
+  const saved  = tgt.levers || {};
+  const plan   = APP.plan[m.id] || {};
+
+  const verdict = (()=>{
+    if(!p) return `<b>${esc(m.label)}</b> did <b>${PKR(c.sales)}</b> in food sales across <b>${NUM(c.orders)}</b> orders — an average basket of <b>${PKR(c.aov)}</b>. Load the previous month to see direction. The largest single opportunity on the board right now is <b>${esc(gaps[0]?gaps[0].name:'—')}</b>, worth about <b>${PKR(gaps[0]?gaps[0].value:0)}</b> a month.`;
+    const d=(c.sales/c.days)-(p.sales/p.days), pc=d/(p.sales/p.days);
+    const dO=c.orders-p.orders, dA=c.aov-p.aov;
+    return `<b>${esc(m.label)}</b> did <b>${PKR(c.sales)}</b>, ${d>=0?'up':'down'} <b>${(Math.abs(pc)*100).toFixed(1)}%</b> a day against ${esc(pl)}.
+      Orders moved ${dO>=0?'up':'down'} <b>${NUM(Math.abs(dO))}</b> and the basket moved ${dA>=0?'up':'down'} <b>${PKR(Math.abs(dA))}</b> to ${PKR(c.aov)}.
+      ${Math.abs(dO*p.aov)>Math.abs(dA*c.orders)? 'Traffic drove the change, so reach and visibility are where to work.' : 'The basket drove the change, so upselling and attach are where to work.'}
+      The biggest lever available is <b>${esc(gaps[0]?gaps[0].name:'—')}</b> at roughly <b>${PKR(gaps[0]?gaps[0].value:0)}</b> a month.`;
+  })();
+
+  $('#p-coach').innerHTML=`
+    <div class="eyebrow">${esc(m.label)}</div><h1>Coaching &amp; action plan</h1>
+    <p class="lede">Everything on the other pages, turned into things a shift can actually do this week.</p>
+
+    <div class="row" style="margin-bottom:18px">
+      <button class="btn red" id="dlPlan">Download action plan (PDF)</button>
+      <button class="btn ghost" id="dlOne">Print staff one-pager</button>
+    </div>
+
+    <div class="card"><h3>Headline verdict</h3><div class="cap">Auto-written from this month's numbers</div>
+      <p class="summary">${verdict}</p></div>
+
+    <div class="board" style="margin-bottom:18px">
+      <h2>The gap board</h2>
+      <div class="bcap">Every opportunity, ranked by what it is worth in a month · total on the table ${PKR(totalOpp)}</div>
+      ${gaps.map(g=>`<div class="gaprow">
+        <div class="gl">${esc(g.name)}<small>${g.lever==='upsize'? 'now ~0% offered':'now '+PCT(g.now)} → target ${PCT(g.target)}</small></div>
+        <div class="gbar"><i style="width:${(g.value/maxGap*100).toFixed(1)}%"></i></div>
+        <div class="gv">${PKR(g.value)}</div></div>`).join('')}
+    </div>
+
+    <h2 style="margin:26px 0 4px">Hit your target</h2>
+    <p class="lede" style="margin-bottom:14px">Enter what you need to do next month. Then move the sliders until the coverage bar fills.</p>
+    <div class="card">
+      <div class="row" style="margin-bottom:12px">
+        <div class="pick"><label for="tgtIn">Monthly sales target (PKR)</label>
+          <input type="number" id="tgtIn" value="${target||''}" placeholder="e.g. ${Math.round(c.sales*1.1/1000)*1000}" style="width:190px"></div>
+        <div class="pick"><label>&nbsp;</label><button class="btn sm" id="tgtSave">Set target</button></div>
+        <div class="pick"><label>&nbsp;</label><button class="btn ghost sm" id="tgtSuggest">Suggest +10%</button></div>
+      </div>
+      <div id="tgtBody"></div>
+    </div>
+
+    <h2 style="margin:26px 0 4px">Top five actions</h2>
+    <p class="lede" style="margin-bottom:14px">Ranked by money on the table. Each one names an owner and a way to check it next month.</p>
+    ${acts.map((a,i)=>`<div class="act">
+      <div class="ah"><div class="at">${i+1}. ${esc(a.t)}</div><div class="pk">${PKR(a.pkr)}/mo</div></div>
+      <dl>
+        <dt>Why</dt><dd>${esc(a.why)}</dd>
+        <dt>Owner</dt><dd>${esc(a.who)}</dd>
+        <dt>Check</dt><dd>${esc(a.how)}</dd>
+        <dt>Effort</dt><dd>${esc(a.eff)}</dd>
+        <dt>Basis</dt><dd class="mini">${esc(a.assume)}</dd>
+      </dl></div>`).join('')}
+
+    <h2 style="margin:26px 0 4px">Upsell scripts</h2>
+    <p class="lede" style="margin-bottom:14px">Built from your own top sellers and your most-ordered dip. Say these word for word.</p>
+    ${scripts.map(s=>`<div class="script"><div class="sw">When they order ${esc(s.item)}</div>
+      <q>${esc(s.line.replace(/^"|"$/g,''))}</q><br><q style="color:var(--steel)">${esc(s.follow.replace(/^"|"$/g,''))}</q></div>`).join('')}
+
+    <h2 style="margin:26px 0 4px">Four-week plan</h2>
+    <div class="grid g4">
+      ${weekPlan(acts).map((w,wi)=>`<div class="wk"><h4>${w.title}</h4>
+        ${w.items.map((it,ii)=>{const k='w'+wi+'i'+ii;
+          return `<label><input type="checkbox" data-pk="${k}" ${plan[k]?'checked':''}><span>${esc(it)}</span></label>`}).join('')}
+      </div>`).join('')}
+    </div>
+
+    <h2 style="margin:26px 0 4px">Scorecard review</h2>
+    ${scorecard(c,p,pl)}`;
+
+  // target planner
+  const renderTgt=()=>{
+    const t = +$('#tgtIn').value || 0;
+    const gp = Math.max(0, t - c.sales);
+    const vals = {}; levers.forEach(l=> vals[l.id] = saved[l.id]!=null? saved[l.id] : l.def);
+    const body = $('#tgtBody');
+    body.innerHTML = `
+      ${t? `<div class="grid g4" style="margin-bottom:14px">
+        ${tile('T','Target', PKR(t), null)}
+        ${tile('T','This month', PKR(c.sales), null)}
+        ${tile('T','Gap to close', PKR(gp), null)}
+        ${tile('T','Needed per day', PKR(t/c.days), null)}
+      </div>` : '<div class="note" style="margin-bottom:14px">Enter a target above and the planner will work out how to reach it from your own numbers.</div>'}
+      <div id="levers">${levers.map(l=>`
+        <div class="lever" data-l="${l.id}">
+          <div><div class="ln">${esc(l.name)}</div><div class="ls" id="n-${l.id}"></div></div>
+          <input type="range" min="0" max="${l.max}" step="${l.step}" value="${vals[l.id]}" id="r-${l.id}">
+          <div class="lv" id="v-${l.id}"></div>
+        </div>`).join('')}</div>
+      <div class="cov"><i id="covBar" style="width:0%"></i><span id="covTxt"></span></div>
+      <div id="covNote" class="mini"></div>`;
+
+    const recalc=()=>{
+      let tot=0;
+      levers.forEach(l=>{
+        const v=+$('#r-'+l.id).value; vals[l.id]=v;
+        const pkr=l.val(v); tot+=pkr;
+        $('#n-'+l.id).textContent = v? l.note(v) : 'not used';
+        $('#v-'+l.id).textContent = v? PKR(pkr) : '—';
+      });
+      const cov = gp? clamp(tot/gp,0,1) : (tot?1:0);
+      $('#covBar').style.width=(cov*100).toFixed(1)+'%';
+      $('#covTxt').textContent = gp? PKR(tot)+' of '+PKR(gp)+' gap covered ('+(cov*100).toFixed(0)+'%)' : PKR(tot)+' of extra sales planned';
+      $('#covNote').innerHTML = !gp? 'Set a target to measure coverage.' :
+        (tot>=gp ? '<span style="color:var(--moss)"><b>Target covered.</b> Projected '+PKR(c.sales+tot)+' — that is '+PKR((c.sales+tot)/c.days)+' a day. Now assign each lever above to an owner in the four-week plan.</span>'
+                 : 'Still short by <b>'+PKR(gp-tot)+'</b>. Add another lever, or accept a target of '+PKR(c.sales+tot)+'.');
+      APP.targets[m.id] = {value:+$('#tgtIn').value||0, levers:vals};
+      store.set('pulse:targets', APP.targets);
+    };
+    levers.forEach(l=> $('#r-'+l.id).oninput=recalc);
+    recalc();
+  };
+  $('#tgtSave').onclick=()=>{ renderTgt(); toast('Target set.'); };
+  $('#tgtSuggest').onclick=()=>{ $('#tgtIn').value=Math.round(c.sales*1.1/1000)*1000; renderTgt(); };
+  $('#tgtIn').onchange=renderTgt;
+  renderTgt();
+
+  $$('[data-pk]').forEach(cb=> cb.onchange=()=>{
+    const st=APP.plan[m.id]||{}; st[cb.dataset.pk]=cb.checked; APP.plan[m.id]=st; store.set('pulse:plan',APP.plan);
+  });
+  $('#dlPlan').onclick=()=>exportPlanPDF(c,p,gaps,acts,scripts);
+  $('#dlOne').onclick=()=>exportOnePagerPDF(c,acts,scripts);
+}
+
+function weekPlan(acts){
+  const a = n => acts[n]? acts[n].t : null;
+  return [
+    {title:'Week 1 · Set up', items:[
+      'Brief the team on this month\u2019s numbers and the one target',
+      a(0)? 'Write the script for: '+a(0) : 'Write the upsell script for the top seller',
+      'Print the one-pager and put it at the order station',
+      'Update the menu board with the promote list']},
+    {title:'Week 2 · Run it', items:[
+      'Listen to five order calls and correct the script live',
+      a(1)? 'Start: '+a(1) : 'Start the second action',
+      'Check dip and drink stock so nobody skips the offer',
+      'Post the running attach rate where the shift can see it']},
+    {title:'Week 3 · Check', items:[
+      'Pull a mid-month product mix and compare attach rates',
+      'Name the two people doing it best and say so publicly',
+      a(2)? 'Fix what is blocking: '+a(2) : 'Fix whatever is blocking the third action',
+      'Drop any action that clearly is not moving']},
+    {title:'Week 4 · Measure', items:[
+      'Export the full month product mix from Pulse',
+      'Load it here and compare against target',
+      'Grade each action hit or missed on the scorecard',
+      'Carry forward anything that missed into next month']}
+  ];
+}
+function scorecard(c,p,pl){
+  if(!p) return '<div class="note">Load the previous month and this grades itself: each target from last month against what actually happened.</div>';
+  const rows=[
+    ['Net food sales', p.sales, c.sales, PKR],
+    ['Orders', p.orders, c.orders, NUM],
+    ['Average order value', p.aov, c.aov, PKR],
+    ['Units per order', p.upo, c.upo, x=>x.toFixed(2)],
+    ['Sides attach', p.atSides, c.atSides, PCT],
+    ['Drinks attach', p.atDrink, c.atDrink, PCT],
+    ['Dessert attach', p.atDess, c.atDess, PCT],
+    ['Dip attach', p.atDip, c.atDip, PCT],
+    ['Premium crust', p.premPen, c.premPen, PCT],
+    ['Menu health score', p.health.score, c.health.score, NUM]
+  ];
+  return `<div class="card"><div class="cap">Last month against this month, so you can see which coaching actually landed</div>
+    <div class="tw"><table><thead><tr><th>Measure</th><th class="r">${esc(pl)}</th><th class="r">Now</th><th class="r">Change</th><th>Result</th></tr></thead><tbody>
+    ${rows.map(r=>{const d=(r[2]-r[1])/(r[1]||1);
+      return `<tr><td>${r[0]}</td><td class="r mono">${r[3](r[1])}</td><td class="r mono">${r[3](r[2])}</td>
+      <td class="r mono ${dg(d)}">${(d>0?'+':'')+(d*100).toFixed(1)}%</td>
+      <td>${d>0.01?'<span class="tag t-star">hit</span>':(d<-0.01?'<span class="tag t-dog">missed</span>':'<span class="tag t-plow">flat</span>')}</td></tr>`}).join('')}
+    </tbody></table></div></div>`;
+}
+
+/* =====================================================================
+   PAGE: ALL 50 KPIs — one index, every number, with its source page
+   ===================================================================== */
+function kpiDefs(c,p,pd){
+  const R=(k)=>{ if(!p) return null; const a=c[k],b=p[k]; return (b==null||b===0)?null:(a-b)/Math.abs(b); };
+  const D=(a,b)=> (b==null||b===0)? null : (a-b)/Math.abs(b);
+  const catN = n => (c.byCat.find(x=>x.key===n)||{net:0,revShare:0,qtyShare:0,ticket:0,orders:0});
+  const pcatN= n => p? (p.byCat.find(x=>x.key===n)||{net:0,revShare:0,ticket:0,orders:0}) : null;
+  const big = c.byCat[0]? c.byCat[0].key : '—';
+  const sz = k => (c.bySize.find(x=>x.key===k)||{share:0,unit:0,qty:0});
+  const g=[];
+  const A=(n,grp,name,val,d,page,note)=>g.push({n,grp,name,val,d,page,note});
+
+  A(1,'Headline','Total net food sales',PKR(c.sales),R('sales'),'overview','Delivery and platform fees excluded');
+  A(2,'Headline','Total units sold',NUM(c.units),R('units'),'overview','');
+  A(3,'Headline','Total orders',NUM(c.orders),R('orders'),'overview','Derived from order-share columns');
+  A(4,'Headline','Average order value',PKR(c.aov),R('aov'),'overview','');
+  A(5,'Headline','Units per order',c.upo.toFixed(2),R('upo'),'overview','');
+  A(6,'Headline','Average selling price per unit',PKR(c.asp),R('asp'),'overview','');
+
+  A(7,'Movers','Top item by revenue',c.topRev[0]?c.topRev[0].key:'—',null,'movers',c.topRev[0]?PKR(c.topRev[0].net):'');
+  A(8,'Movers','Top item by quantity',c.topQty[0]?c.topQty[0].key:'—',null,'movers',c.topQty[0]?NUM(c.topQty[0].qty)+' units':'');
+  A(9,'Movers','Slow movers (5 units or fewer)',NUM(c.sku.filter(s=>s.qty<=5).length),p?D(c.sku.filter(s=>s.qty<=5).length,p.sku.filter(s=>s.qty<=5).length):null,'movers','');
+  A(10,'Movers','Dead SKUs (2 units or fewer)',NUM(c.dead.length),p?D(c.dead.length,p.dead.length):null,'movers','Delist candidates');
+  A(11,'Movers','Items making 80% of sales',NUM(c.p80),p?D(c.p80,p.p80):null,'movers','Out of '+NUM(c.skuCount));
+  A(12,'Movers','Long-tail drag',PCT(c.longTail,1),p?D(c.longTail,p.longTail):null,'movers','Items under 1% of sales each');
+  A(13,'Movers','Revenue per SKU',PKR(c.revPerSku),p?D(c.revPerSku,p.revPerSku):null,'movers','');
+  A(14,'Movers','Best efficiency index',(()=>{const b=[...c.sku].filter(s=>s.qty>=10).sort((x,y)=>y.eff-x.eff)[0];return b?b.eff.toFixed(2)+'×':'—';})(),null,'movers','Sales share ÷ unit share');
+
+  A(15,'Category','Largest category by revenue',big,null,'overview',PCT(catN(big).revShare)+' of sales');
+  A(16,'Category','Largest category by units',(()=>{const b=[...c.byCat].sort((x,y)=>y.qty-x.qty)[0];return b?b.key:'—';})(),null,'overview','');
+  A(17,'Category','Average ticket, largest category',PKR(catN(big).ticket),p?D(catN(big).ticket,pcatN(big).ticket):null,'overview','');
+  A(18,'Category','Orders in largest category',NUM(catN(big).orders),p?D(catN(big).orders,pcatN(big).orders):null,'overview','');
+
+  A(19,'Pizza','Large share of pizza units',PCT(sz('12"-Large').share),null,'pizza','');
+  A(20,'Pizza','Crusts in use',NUM(c.byCrust.length),null,'pizza','Top: '+(c.byCrust[0]?c.byCrust[0].key:'—'));
+  A(21,'Pizza','Premium crust penetration',PCT(c.premPen),R('premPen'),'pizza','');
+  A(22,'Pizza','Top flavour',c.byFlav[0]?c.byFlav[0].key:'—',null,'pizza',c.byFlav[0]?NUM(c.byFlav[0].qty)+' units':'');
+  A(23,'Pizza','Average large price',PKR(sz('12"-Large').unit),null,'pizza','');
+  A(24,'Pizza','Pan dependency',PCT(c.panDep),R('panDep'),'pizza','Share of pizzas on Pan crust');
+
+  A(25,'Attach','Sides attach',PCT(c.atSides),R('atSides'),'overview','');
+  A(26,'Attach','Dessert attach',PCT(c.atDess),R('atDess'),'overview','');
+  A(27,'Attach','Drinks attach',PCT(c.atDrink),R('atDrink'),'overview','');
+  A(28,'Attach','Dip attach',PCT(c.atDip),R('atDip'),'overview','Top dip: '+(c.dips[0]?c.dips[0].key:'—'));
+
+  A(29,'Channel','Delivery penetration',PCT(c.deliveryPen),R('deliveryPen'),'overview','');
+  A(30,'Channel','Aggregator fee leakage',PCT(c.feeLeak,2),R('feeLeak'),'overview',PKR(c.aggFees)+' paid');
+
+  A(31,'Growth','Sales per day',PKR(c.salesPerDay),p?D(c.salesPerDay,p.salesPerDay):null,'trends',c.days+' trading days');
+  A(32,'Growth','Orders per day',NUM(c.ordersPerDay),p?D(c.ordersPerDay,p.ordersPerDay):null,'trends','');
+  A(33,'Growth','Growth driver',(()=>{ if(!p) return '—'; const fo=(c.orders-p.orders)*p.aov, fa=(c.aov-p.aov)*c.orders;
+      return Math.abs(fo)>Math.abs(fa)?'Traffic':'Basket size'; })(),null,'overview','Sales change decomposed');
+  A(34,'Growth','Biggest mix gain',(()=>{ if(!p) return '—'; const b=c.byCat.map(x=>{const q=p.byCat.find(y=>y.key===x.key);
+      return {k:x.key,d:x.revShare-(q?q.net/p.sales:0)}}).sort((x,y)=>y.d-x.d)[0]; return b? b.k+' '+PP(b.d):'—'; })(),null,'overview','');
+  A(35,'Growth','Biggest gainer',(()=>{ if(!p) return '—'; const pm=new Map(p.sku.map(x=>[x.key,x]));
+      const b=c.sku.map(x=>({k:x.key,d:x.net-((pm.get(x.key)||{}).net||0)})).sort((x,y)=>y.d-x.d)[0]; return b?b.k:'—'; })(),null,'movers','');
+  A(36,'Growth','Biggest decliner',(()=>{ if(!p) return '—'; const pm=new Map(p.sku.map(x=>[x.key,x]));
+      const b=c.sku.map(x=>({k:x.key,d:x.net-((pm.get(x.key)||{}).net||0)})).sort((x,y)=>x.d-y.d)[0]; return b?b.k:'—'; })(),null,'movers','');
+  A(37,'Growth','New SKUs this month',p?NUM(c.sku.filter(x=>!p.sku.some(y=>y.key===x.key)).length):'—',null,'movers','');
+  A(38,'Growth','SKUs that stopped selling',p?NUM(p.sku.filter(x=>!c.sku.some(y=>y.key===x.key)).length):'—',null,'movers','');
+  A(39,'Growth','Menu velocity',PCT(c.velocity,0),R('velocity'),'movers','Listed items that actually sold');
+  A(40,'Growth','SKU churn rate',(()=>{ if(!p) return '—'; const nw=c.sku.filter(x=>!p.sku.some(y=>y.key===x.key)).length;
+      const ls=p.sku.filter(x=>!c.sku.some(y=>y.key===x.key)).length; return PCT((nw+ls)/c.skuCount,1); })(),null,'movers','');
+
+  A(41,'Pricing','Average price, largest category',PKR(catN(big).net/Math.max(1,catN(big).qty)),null,'pizza','');
+  A(42,'Pricing','Worst price realization',c.realization[0]? PCT(c.realization[0].real,0):'—',null,'pizza',c.realization[0]?c.realization[0].key:'');
+  A(43,'Pricing','Items leaking over 10% of price',NUM(c.leaks.length),null,'pizza',c.leaks.length?PKR(sum(c.leaks,x=>(x.list-x.unit)*x.qty))+' shortfall':'None');
+  A(44,'Pricing','Upsize opportunity',PKR(c.upsizeValue),null,'pizza','10% of mediums moved to large');
+  A(45,'Pricing','Premium crust uplift earned',PKR(c.premUplift),null,'pizza','Against a Pan baseline');
+
+  A(46,'Basket','Items per order',c.upo.toFixed(2),R('upo'),'overview','');
+  A(47,'Basket','Add-on units per order',c.addonPerOrder.toFixed(2),R('addonPerOrder'),'overview','Everything that is not a pizza');
+  A(48,'Basket','Combo / MyBox penetration',PCT(c.comboPen),R('comboPen'),'overview','');
+  A(49,'Basket','Add-on affinity spread',PCT(Math.max(c.atSides,c.atDrink,c.atDess,c.atDip)),null,'overview','Strongest add-on group');
+  A(50,'Risk','Top 5 concentration',PCT(c.top5Conc),R('top5Conc'),'movers','Sales riding on five items');
+  return g;
+}
+function pageKpis(){
+  const m=M(); if(!m){ $('#p-kpis').innerHTML=empty(); return; }
+  const c=metrics(m), p=metrics(P()), pl=P()?P().label:'';
+  const defs=kpiDefs(c,p,perDay());
+  const groups=[...new Set(defs.map(d=>d.grp))];
+  $('#p-kpis').innerHTML=`
+    <div class="eyebrow">${esc(m.label)} · ${defs.length} measures</div><h1>All 50 KPIs</h1>
+    <p class="lede">Every measure in one index, with its change against ${pl?'<b>'+esc(pl)+'</b>':'nothing yet'} and the page
+    where it is broken down. Tap any row to jump there.</p>
+    <div class="row" style="margin-bottom:14px">
+      <input type="text" id="kq" placeholder="Filter KPIs…" style="width:240px">
+      <button class="btn ghost sm" id="kcsv">Export all 50 (CSV)</button>
+    </div>
+    ${groups.map(gr=>`
+      <div class="card"><h3>${esc(gr)}</h3><div class="cap">${defs.filter(d=>d.grp===gr).length} measures</div>
+      <div class="tw" style="max-height:none"><table><thead><tr><th style="width:44px">#</th><th>Measure</th>
+        <th class="r">Value</th><th class="r">vs ${esc(pl||'—')}</th><th>Detail</th></tr></thead><tbody>
+      ${defs.filter(d=>d.grp===gr).map(d=>`<tr class="krow" data-go="${d.page}" data-t="${esc((d.n+' '+d.name+' '+d.note).toLowerCase())}" style="cursor:pointer">
+        <td class="mono" style="color:var(--mute)">${String(d.n).padStart(2,'0')}</td>
+        <td><b>${esc(d.name)}</b></td>
+        <td class="r mono">${esc(d.val)}</td>
+        <td class="r mono ${d.d==null?'':dg(d.d)}">${d.d==null?'—':arrow(d.d)+' '+(d.d*100).toFixed(1)+'%'}</td>
+        <td class="mini">${esc(d.note)}</td></tr>`).join('')}
+      </tbody></table></div></div>`).join('')}`;
+  $$('.krow').forEach(r=> r.onclick=()=>go(r.dataset.go));
+  $('#kq').oninput=e=>{ const t=e.target.value.toLowerCase();
+    $$('.krow').forEach(r=> r.style.display = r.dataset.t.indexOf(t)>=0? '':'none'); };
+  $('#kcsv').onclick=()=>{
+    const lines=[['#','Group','Measure','Value','Change vs '+(pl||'n/a'),'Detail'].join(',')]
+      .concat(defs.map(d=>[d.n,d.grp,d.name,d.val,d.d==null?'':(d.d*100).toFixed(1)+'%',d.note]
+        .map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')));
+    const b=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='kpis-'+m.id+'.csv'; a.click(); URL.revokeObjectURL(a.href);
+    toast('All 50 KPIs exported.');
+  };
+}
+
+/* =====================================================================
+   PAGE: DATA TABLE
+   ===================================================================== */
+function pageData(){
+  const m=M(); if(!m){ $('#p-data').innerHTML=empty(); return; }
+  const c=metrics(m), p=metrics(P()), pl=P()?P().label:'';
+  const prev = p? new Map(p.sku.map(s=>[s.key,s])) : new Map();
+  const data = c.sku.map(s=>{const q=prev.get(s.key); return {...s, pQty:q?q.qty:null, pNet:q?q.net:null,
+      dQty:q?s.qty-q.qty:null, dNet:q?s.net-q.net:null, dMix:q?s.netShare-(q.net/p.sales):null};});
+  const st = APP.sort.data || {k:'net',dir:-1};
+  data.sort((a,b)=>{const x=a[st.k],y=b[st.k]; if(typeof x==='string') return st.dir*x.localeCompare(y); return st.dir*((x||0)-(y||0));});
+  const cols=[['key','Item',''],['cat','Category',''],['qty','Qty','r'],['net','Net sales','r'],['unit','Unit price','r'],
+    ['netShare','Sales mix','r'],['orders','Orders','r'],['quad','Type',''],['dQty','Δ qty','r'],['dNet','Δ net','r'],['dMix','Δ mix','r']];
+  const fmt={qty:NUM,net:PKR,unit:PKR,netShare:PCT,orders:NUM,dQty:NUM,dNet:PKR,dMix:x=>x==null?'—':PP(x)};
+
+  $('#p-data').innerHTML=`
+    <div class="eyebrow">${esc(m.label)} · ${NUM(data.length)} items</div><h1>Data table</h1>
+    <p class="lede">Every parsed line, sortable, with the change against ${pl? '<b>'+esc(pl)+'</b>':'nothing (load another month)'}.</p>
+    <div class="row" style="margin-bottom:12px">
+      <input type="text" id="q" placeholder="Filter items…" style="width:260px">
+      <button class="btn ghost sm" id="csv">Export CSV</button>
+      ${m.warnings.length? '<span class="tag t-dog">'+m.warnings.length+' parse warnings</span>':'<span class="tag t-star">parsed clean</span>'}
+    </div>
+    ${m.warnings.length? '<div class="note" style="margin-bottom:12px">'+m.warnings.slice(0,8).map(esc).join('<br>')+'</div>':''}
+    <div class="tw" id="tw"><table><thead><tr>${cols.map(x=>`<th class="${x[2]}" data-k="${x[0]}">${x[1]}${st.k===x[0]?(st.dir<0?' ▼':' ▲'):''}</th>`).join('')}</tr></thead>
+      <tbody id="tb">${data.map(r=>rowHtml(r,cols,fmt)).join('')}</tbody></table></div>`;
+
+  $$('#p-data th').forEach(th=> th.onclick=()=>{
+    const k=th.dataset.k; APP.sort.data = {k, dir: (st.k===k? -st.dir : -1)}; pageData();
+  });
+  $('#q').oninput=e=>{
+    const t=e.target.value.toLowerCase();
+    $('#tb').innerHTML = data.filter(r=>r.key.toLowerCase().indexOf(t)>=0||r.cat.toLowerCase().indexOf(t)>=0).map(r=>rowHtml(r,cols,fmt)).join('');
+  };
+  $('#csv').onclick=()=>exportCSV();
+}
+function rowHtml(r,cols,fmt){
+  return '<tr>'+cols.map(x=>{
+    let v=r[x[0]];
+    if(x[0]==='quad') return '<td><span class="tag '+qcls(v)+'">'+v+'</span></td>';
+    if(v==null) return '<td class="'+(x[2]?'r mono':'')+'">—</td>';
+    const f=fmt[x[0]]; const t=f?f(v):esc(v);
+    const cls = (x[0].charAt(0)==='d' && x[0].length<6) ? ' '+dg(v) : '';
+    return '<td class="'+(x[2]?'r mono':'')+cls+'">'+t+'</td>';
+  }).join('')+'</tr>';
+}
+
+/* =====================================================================
+   PAGE: SETUP — food costs & targets
+   ===================================================================== */
+function pageSetup(){
+  const m=M();
+  const c = m? metrics(m) : null;
+  const top = c? [...c.sku].sort((a,b)=>b.net-a.net).slice(0,60) : [];
+  $('#p-setup').innerHTML=`
+    <div class="eyebrow">Settings</div><h1>Setup</h1>
+    <p class="lede">Food costs turn the menu-engineering matrix from a price guess into real contribution margin.
+    Enter either a cost per unit in PKR, or a food-cost ratio between 0 and 1 (for example 0.32 for 32%).</p>
+
+    ${!m? '<div class="note">Load a month first.</div>' : `
+    <div class="card"><h3>Food cost by item</h3>
+      <div class="cap">Top 60 items by revenue. Costs are saved automatically and apply to every month.</div>
+      <div class="row" style="margin-bottom:10px">
+        <label class="mini">Fill blanks with a flat food-cost ratio <input type="number" id="flat" value="0.32" step="0.01" min="0.05" max="0.9" style="width:80px"></label>
+        <button class="btn ghost sm" id="fill">Apply to blanks</button>
+        <button class="btn ghost sm" id="clear">Clear all costs</button>
+      </div>
+      <div class="tw"><table><thead><tr><th>Item</th><th class="r">Price</th><th class="r">Qty</th><th class="r">Cost input</th><th class="r">Margin</th></tr></thead><tbody>
+      ${top.map(s=>{ const v=APP.costs[s.key];
+        const uc = v==null?null:(v<=1? s.unit*v : v);
+        return `<tr><td>${esc(s.key)}</td><td class="r mono">${PKR(s.unit)}</td><td class="r mono">${NUM(s.qty)}</td>
+        <td class="r"><input type="number" step="0.01" data-cost="${esc(s.key)}" value="${v==null?'':v}" placeholder="—" style="width:96px;text-align:right"></td>
+        <td class="r mono ${uc==null?'':dg(s.unit-uc)}">${uc==null?'—':PKR(s.unit-uc)+' ('+PCT((s.unit-uc)/s.unit,0)+')'}</td></tr>`}).join('')}
+      </tbody></table></div></div>
+
+    <div class="card"><h3>Monthly targets</h3><div class="cap">One target per loaded month. The coaching page plans against these.</div>
+      <div class="tw" style="max-height:none"><table><thead><tr><th>Month</th><th class="r">Actual</th><th class="r">Target</th><th class="r">Result</th></tr></thead><tbody>
+      ${APP.months.map(x=>{const mm=compute(x,APP.costs), t=(APP.targets[x.id]||{}).value||0;
+        return `<tr><td><b>${esc(x.label)}</b></td><td class="r mono">${PKR(mm.sales)}</td>
+        <td class="r"><input type="number" data-tgt="${x.id}" value="${t||''}" placeholder="—" style="width:130px;text-align:right"></td>
+        <td class="r mono ${t? dg(mm.sales-t):''}">${t? (mm.sales>=t?'hit by ':'short by ')+PKR(Math.abs(mm.sales-t)) : '—'}</td></tr>`}).join('')}
+      </tbody></table></div></div>
+
+    <div class="card"><h3>Danger zone</h3><div class="cap">Removes every month, cost and target stored in this browser</div>
+      <button class="btn red" id="wipe">Delete everything</button></div>`}`;
+
+  $$('[data-cost]').forEach(i=> i.onchange=async()=>{
+    const k=i.dataset.cost, v=parseFloat(i.value);
+    if(isNaN(v)||v<=0) delete APP.costs[k]; else APP.costs[k]=v;
+    await store.set('pulse:costs',APP.costs); pageSetup(); toast('Cost saved.');
+  });
+  $$('[data-tgt]').forEach(i=> i.onchange=async()=>{
+    const id=i.dataset.tgt, v=parseFloat(i.value)||0;
+    APP.targets[id]=Object.assign({}, APP.targets[id], {value:v});
+    await store.set('pulse:targets',APP.targets); pageSetup(); toast('Target saved.');
+  });
+  if($('#fill')) $('#fill').onclick=async()=>{
+    const r=parseFloat($('#flat').value)||0.32;
+    top.forEach(s=>{ if(APP.costs[s.key]==null) APP.costs[s.key]=r; });
+    await store.set('pulse:costs',APP.costs); pageSetup(); toast('Applied '+(r*100).toFixed(0)+'% food cost to blanks.');
+  };
+  if($('#clear')) $('#clear').onclick=async()=>{ APP.costs={}; await store.set('pulse:costs',{}); pageSetup(); toast('Costs cleared.'); };
+  if($('#wipe')) $('#wipe').onclick=async()=>{
+    if(!confirm('Delete every loaded month, cost and target? This cannot be undone.')) return;
+    APP.months=[];APP.costs={};APP.targets={};APP.plan={};APP.cur=null;APP.cmp=null;
+    await store.set('pulse:months',[]); await store.set('pulse:costs',{}); await store.set('pulse:targets',{}); await store.set('pulse:plan',{});
+    go('upload'); toast('Everything deleted.');
+  };
+}
+
+/* =====================================================================
+   EXPORTS
+   ===================================================================== */
+function exportCSV(){
+  const m=M(); if(!m) return;
+  const c=metrics(m);
+  const head=['Category','Item','Size','Crust','Quantity','Net Amount','Unit Price','Sales Mix %','Orders','Quadrant'];
+  const lines=[head.join(',')].concat(c.sku.map(s=>[s.cat,s.item,s.size,s.crust,s.qty,s.net.toFixed(2),s.unit.toFixed(2),
+    (s.netShare*100).toFixed(3),s.orders,s.quad].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')));
+  const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='product-mix-'+m.id+'.csv'; a.click(); URL.revokeObjectURL(a.href);
+  toast('CSV downloaded.');
+}
+
+/* --- jsPDF helpers --- */
+function newDoc(){
+  const {jsPDF}=window.jspdf; const d=new jsPDF({unit:'pt',format:'a4'});
+  d._y=0; d.W=d.internal.pageSize.getWidth(); d.H=d.internal.pageSize.getHeight(); d.MX=44;
+  return d;
+}
+function head(d,title,sub){
+  d.setFillColor(21,26,33); d.rect(0,0,d.W,84,'F');
+  d.setFillColor(200,16,46); d.rect(0,84,d.W,4,'F');
+  d.setTextColor(255); d.setFont('helvetica','bold'); d.setFontSize(20); d.text(title,d.MX,44);
+  d.setFont('helvetica','normal'); d.setFontSize(9.5); d.setTextColor(190,198,208); d.text(sub,d.MX,64);
+  d.setTextColor(21,26,33); d._y=118;
+}
+function brk(d,need){ if(d._y+(need||24)>d.H-48){ d.addPage(); d._y=56; } }
+function h2(d,t){ brk(d,40); d.setFont('helvetica','bold'); d.setFontSize(13); d.setTextColor(21,26,33); d.text(t.toUpperCase(),d.MX,d._y); d._y+=6;
+  d.setDrawColor(200,16,46); d.setLineWidth(1.4); d.line(d.MX,d._y,d.MX+34,d._y); d._y+=16; }
+function para(d,t,size){ d.setFont('helvetica','normal'); d.setFontSize(size||10); d.setTextColor(50,58,68);
+  const lines=d.splitTextToSize(t,d.W-d.MX*2); lines.forEach(l=>{ brk(d,15); d.text(l,d.MX,d._y); d._y+=13.6; }); d._y+=6; }
+function kv(d,rows,cols){
+  cols=cols||3; const w=(d.W-d.MX*2)/cols;
+  for(let i=0;i<rows.length;i+=cols){
+    brk(d,52);
+    const y=d._y;
+    for(let j=0;j<cols;j++){
+      const r=rows[i+j]; if(!r) continue; const x=d.MX+j*w;
+      d.setDrawColor(215,221,228); d.setLineWidth(.7); d.rect(x,y,w-8,46);
+      d.setFont('helvetica','normal'); d.setFontSize(7.4); d.setTextColor(110,120,132); d.text(String(r[0]).toUpperCase(),x+8,y+15);
+      d.setFont('helvetica','bold'); d.setFontSize(13); d.setTextColor(21,26,33); d.text(String(r[1]),x+8,y+33);
+      if(r[2]){ d.setFont('helvetica','normal'); d.setFontSize(7.6); d.setTextColor(r[3]||120,r[3]!=null?120:126,r[3]!=null?100:136); d.text(String(r[2]),x+8,y+42); }
+    }
+    d._y=y+56;
+  }
+}
+function table(d,cols,rows,widths){
+  const W=d.W-d.MX*2; const ws=widths.map(x=>x*W);
+  brk(d,40);
+  d.setFillColor(21,26,33); d.rect(d.MX,d._y,W,20,'F');
+  d.setFont('helvetica','bold'); d.setFontSize(8); d.setTextColor(255);
+  let x=d.MX; cols.forEach((c,i)=>{ d.text(String(c).toUpperCase(), i? x+ws[i]-5 : x+6, d._y+13.5, {align:i?'right':'left'}); x+=ws[i]; });
+  d._y+=20;
+  d.setFont('helvetica','normal'); d.setFontSize(8.6); d.setTextColor(40,48,58);
+  rows.forEach((r,ri)=>{
+    brk(d,18);
+    if(ri%2){ d.setFillColor(246,248,250); d.rect(d.MX,d._y,W,16,'F'); }
+    let x=d.MX;
+    r.forEach((c,i)=>{
+      let t=String(c);
+      const maxw=ws[i]-12;
+      while(d.getTextWidth(t)>maxw && t.length>4) t=t.slice(0,-2);
+      d.text(t, i? x+ws[i]-5 : x+6, d._y+11.4, {align:i?'right':'left'}); x+=ws[i];
+    });
+    d._y+=16;
+  });
+  d._y+=12;
+}
+function foot(d,label){
+  const n=d.internal.getNumberOfPages();
+  for(let i=1;i<=n;i++){ d.setPage(i); d.setFont('helvetica','normal'); d.setFontSize(7.4); d.setTextColor(140,150,162);
+    d.text(label,d.MX,d.H-24); d.text('Page '+i+' of '+n,d.W-d.MX,d.H-24,{align:'right'}); }
+}
+
+function exportNumbersPDF(){
+  const m=M(); if(!m) return toast('Load a month first.');
+  const c=metrics(m), p=metrics(P()), pl=P()?P().label:'no comparison';
+  const d=newDoc();
+  head(d,'Product mix — the numbers', (m.store||'Store')+'  ·  '+m.label+'  ·  '+m.begin+' to '+m.end+'  ·  vs '+pl);
+  const dd=(a,b)=> b? ((a-b)/Math.abs(b)>=0?'+':'')+(((a-b)/Math.abs(b))*100).toFixed(1)+'% vs '+pl : '';
+  h2(d,'Headline');
+  kv(d,[
+    ['Net food sales',PKR(c.sales),p?dd(c.sales,p.sales):''],
+    ['Units sold',NUM(c.units),p?dd(c.units,p.units):''],
+    ['Orders',NUM(c.orders),p?dd(c.orders,p.orders):''],
+    ['Average order value',PKR(c.aov),p?dd(c.aov,p.aov):''],
+    ['Units per order',c.upo.toFixed(2),p?dd(c.upo,p.upo):''],
+    ['Average item price',PKR(c.asp),p?dd(c.asp,p.asp):''],
+    ['Sales per day',PKR(c.salesPerDay),m.days+' days'],
+    ['Menu health score',c.health.score+'/100',''],
+    ['Items on menu',NUM(c.skuCount),c.p80+' make 80% of sales']
+  ]);
+  h2(d,'Category performance');
+  table(d,['Category','Net sales','Share','Units','Ticket'],
+    c.byCat.map(x=>[x.key,PKR(x.net),PCT(x.revShare),NUM(x.qty),PKR(x.ticket)]),[.34,.20,.13,.15,.18]);
+  h2(d,'Top 15 items by revenue');
+  table(d,['Item','Qty','Net sales','Unit','Type'],
+    c.topRev.slice(0,15).map(s=>[s.key,NUM(s.qty),PKR(s.net),PKR(s.unit),s.quad]),[.42,.11,.20,.14,.13]);
+  h2(d,'Pizza mix');
+  table(d,['Size','Units','Share','Avg price'], c.bySize.map(s=>[s.key,NUM(s.qty),PCT(s.share),PKR(s.unit)]),[.40,.20,.20,.20]);
+  table(d,['Crust','Units','Share','Avg price'], c.byCrust.map(s=>[s.key,NUM(s.qty),PCT(s.share),PKR(s.unit)]),[.40,.20,.20,.20]);
+  h2(d,'Attach and channel');
+  kv(d,[['Sides attach',PCT(c.atSides),''],['Drinks attach',PCT(c.atDrink),''],['Dessert attach',PCT(c.atDess),''],
+        ['Dip attach',PCT(c.atDip),''],['Premium crust',PCT(c.premPen),''],['Pan dependency',PCT(c.panDep),''],
+        ['Delivery penetration',PCT(c.deliveryPen),''],['Aggregator fees',PKR(c.aggFees),PCT(c.feeLeak,2)+' of sales'],
+        ['Top 5 concentration',PCT(c.top5Conc),'']]);
+  if(p){
+    h2(d,'Biggest movers vs '+pl);
+    const pm=new Map(p.sku.map(s=>[s.key,s]));
+    const mv=c.sku.map(s=>({k:s.key,d:s.net-((pm.get(s.key)||{}).net||0)}));
+    table(d,['Gained','PKR'], [...mv].sort((a,b)=>b.d-a.d).slice(0,8).map(x=>[x.k,PKR(x.d)]),[.66,.34]);
+    table(d,['Lost','PKR'], [...mv].sort((a,b)=>a.d-b.d).slice(0,8).map(x=>[x.k,PKR(x.d)]),[.66,.34]);
+  }
+  d.addPage(); d._y=56;
+  h2(d,'Full KPI index');
+  const defs=kpiDefs(c,p,false);
+  [...new Set(defs.map(x=>x.grp))].forEach(gr=>{
+    brk(d,50);
+    d.setFont('helvetica','bold'); d.setFontSize(9.5); d.setTextColor(200,16,46); d.text(gr.toUpperCase(),d.MX,d._y); d._y+=13;
+    table(d,['#','Measure','Value','Change'],
+      defs.filter(x=>x.grp===gr).map(x=>[String(x.n).padStart(2,'0'),x.name,x.val,x.d==null?'—':((x.d>0?'+':'')+(x.d*100).toFixed(1)+'%')]),
+      [.07,.53,.24,.16]);
+  });
+  foot(d,'Pulse PM Analyzer  ·  '+m.label+'  ·  generated '+new Date().toLocaleDateString());
+  d.save('pulse-numbers-'+m.id+'.pdf'); toast('Numbers PDF downloaded.');
+}
+
+function exportPlanPDF(c,p,gaps,acts,scripts){
+  const m=M(); const d=newDoc();
+  const tgt=(APP.targets[m.id]||{}).value||0;
+  head(d,'Action plan', (m.store||'Store')+'  ·  '+m.label+'  ·  prepared for '+(m.member||'the store team'));
+  h2(d,'Where we are');
+  kv(d,[['Net food sales',PKR(c.sales),''],['Orders',NUM(c.orders),''],['Average basket',PKR(c.aov),''],
+        ['Menu health',c.health.score+'/100',''],['Opportunity on the table',PKR(sum(gaps,g=>g.value)),''],
+        ['Target',tgt?PKR(tgt):'not set',tgt?PKR(Math.max(0,tgt-c.sales))+' to find':'']]);
+  para(d, p? 'Against '+P().label+', sales moved '+(((c.sales/c.days)-(p.sales/p.days))>=0?'up':'down')+' '+
+      Math.abs((((c.sales/c.days)-(p.sales/p.days))/(p.sales/p.days))*100).toFixed(1)+
+      '% a day, orders moved '+NUM(c.orders-p.orders)+' and the basket moved '+PKR(c.aov-p.aov)+
+      '. The biggest lever available is '+(gaps[0]?gaps[0].name.toLowerCase():'attach rate')+'.'
+    : 'This is the first month loaded, so there is no comparison yet. The biggest lever available is '+(gaps[0]?gaps[0].name.toLowerCase():'attach rate')+'.');
+
+  h2(d,'The gap board');
+  table(d,['Opportunity','Now','Target','Worth per month'],
+    gaps.map(g=>[g.name, g.lever==='upsize'?'~0%':PCT(g.now), PCT(g.target), PKR(g.value)]),[.42,.16,.16,.26]);
+
+  h2(d,'Top five actions');
+  acts.forEach((a,i)=>{
+    brk(d,110);
+    const W=d.W-d.MX*2, y=d._y;
+    d.setDrawColor(215,221,228); d.setLineWidth(.7); d.rect(d.MX,y,W,4,'S');
+    d.setFillColor(200,16,46); d.rect(d.MX,y,3.5,96,'F');
+    d.setFont('helvetica','bold'); d.setFontSize(12); d.setTextColor(21,26,33);
+    d.text((i+1)+'. '+a.t, d.MX+12, y+16);
+    d.setFontSize(12); d.setTextColor(46,125,79); d.text(PKR(a.pkr)+'/mo', d.W-d.MX, y+16, {align:'right'});
+    d._y=y+30;
+    const row=(k,v)=>{ d.setFont('helvetica','bold'); d.setFontSize(7.4); d.setTextColor(110,120,132); d.text(k.toUpperCase(),d.MX+12,d._y);
+      d.setFont('helvetica','normal'); d.setFontSize(9); d.setTextColor(40,48,58);
+      const ls=d.splitTextToSize(v,W-84); ls.forEach((l,li)=>{ d.text(l,d.MX+66,d._y+li*11.5); });
+      d._y += Math.max(13, ls.length*11.5+2); };
+    row('Why',a.why); row('Owner',a.who); row('Check',a.how); row('Effort',a.eff); row('Basis',a.assume);
+    d._y+=12;
+  });
+
+  if(tgt){
+    h2(d,'How to hit '+PKR(tgt));
+    const lv=targetLevers(c), saved=(APP.targets[m.id]||{}).levers||{};
+    const used=lv.filter(l=>(saved[l.id]||0)>0);
+    para(d,'Gap to close: '+PKR(Math.max(0,tgt-c.sales))+'. That is '+PKR(tgt/c.days)+' a day against '+PKR(c.salesPerDay)+' today.');
+    if(used.length){
+      table(d,['Lever','Move','Adds'], used.map(l=>[l.name, (saved[l.id])+l.unit, PKR(l.val(saved[l.id]))]),[.46,.24,.30]);
+      const tot=sum(used,l=>l.val(saved[l.id]));
+      para(d,'Planned levers add '+PKR(tot)+', which covers '+
+        Math.round(tot/Math.max(1,tgt-c.sales)*100)+'% of the gap. Projected close: '+PKR(c.sales+tot)+'.');
+    } else para(d,'No levers selected yet. Open the coaching page and move the sliders to build the plan.');
+  }
+
+  h2(d,'Upsell scripts');
+  scripts.forEach(s=>{ brk(d,54);
+    d.setFont('helvetica','bold'); d.setFontSize(8); d.setTextColor(110,120,132); d.text('WHEN THEY ORDER '+s.item.toUpperCase(),d.MX,d._y); d._y+=13;
+    d.setFont('helvetica','italic'); d.setFontSize(10); d.setTextColor(21,26,33);
+    d.splitTextToSize(s.line,d.W-d.MX*2).forEach(l=>{ brk(d,14); d.text(l,d.MX,d._y); d._y+=13; });
+    d.setTextColor(90,102,117);
+    d.splitTextToSize(s.follow,d.W-d.MX*2).forEach(l=>{ brk(d,14); d.text(l,d.MX,d._y); d._y+=13; });
+    d._y+=8;
+  });
+
+  h2(d,'Four-week plan');
+  weekPlan(acts).forEach(w=>{
+    brk(d,60);
+    d.setFont('helvetica','bold'); d.setFontSize(10); d.setTextColor(200,16,46); d.text(w.title,d.MX,d._y); d._y+=15;
+    d.setFont('helvetica','normal'); d.setFontSize(9.4); d.setTextColor(40,48,58);
+    w.items.forEach(it=>{ brk(d,15); d.setDrawColor(150,160,172); d.rect(d.MX+2,d._y-8,8,8,'S');
+      d.splitTextToSize(it,d.W-d.MX*2-22).forEach((l,li)=>{ if(li){brk(d,13); d._y+=12;} d.text(l,d.MX+18,d._y); });
+      d._y+=15; });
+    d._y+=6;
+  });
+  foot(d,'Action plan  ·  '+m.label+'  ·  '+(m.store||''));
+  d.save('action-plan-'+m.id+'.pdf'); toast('Action plan downloaded.');
+}
+
+function exportOnePagerPDF(c,acts,scripts){
+  const m=M(); const d=newDoc();
+  const tgt=(APP.targets[m.id]||{}).value||0;
+  head(d,'This month at the order station', m.label+'  ·  '+(m.store||'')+'  ·  keep this by the phone');
+  h2(d,'Push these three');
+  const push=[...c.sku].filter(s=>s.quad==='Star').sort((a,b)=>b.margin-a.margin).slice(0,3);
+  (push.length?push:c.topRev.slice(0,3)).forEach((s,i)=>{
+    brk(d,30); d.setFont('helvetica','bold'); d.setFontSize(17); d.setTextColor(21,26,33);
+    d.text((i+1)+'.  '+s.item+(s.size?' '+s.size:''),d.MX,d._y);
+    d.setFont('helvetica','normal'); d.setFontSize(10); d.setTextColor(110,120,132);
+    d.text(PKR(s.unit),d.W-d.MX,d._y,{align:'right'}); d._y+=26;
+  });
+  h2(d,'Say these three lines');
+  scripts.slice(0,3).forEach(s=>{ brk(d,40);
+    d.setFont('helvetica','italic'); d.setFontSize(12.5); d.setTextColor(21,26,33);
+    d.splitTextToSize(s.line,d.W-d.MX*2).forEach(l=>{ brk(d,18); d.text(l,d.MX,d._y); d._y+=17; }); d._y+=10; });
+  h2(d,'This month we are chasing');
+  const gl=gapList(c), gt=k=>{const x=gl.find(y=>y.lever===k); return x? 'target '+PCT(x.target):'hold';};
+  const rows=[['Drinks attach',PCT(c.atDrink),gt('drink')],
+              ['Dessert attach',PCT(c.atDess),gt('dess')],
+              ['Sides attach',PCT(c.atSides),gt('sides')],
+              ['Large share',PCT((c.bySize.find(s=>s.key==='12"-Large')||{share:0}).share),'up 2 points'],
+              ['Premium crust',PCT(c.premPen),gt('prem')],
+              ['Sales target',tgt?PKR(tgt):'—',tgt?PKR(tgt/c.days)+' a day':'set one']];
+  kv(d,rows,2);
+  d.setFont('helvetica','bold'); d.setFontSize(11); d.setTextColor(200,16,46);
+  brk(d,30); d.text('Last month we did '+PKR(c.sales)+' from '+NUM(c.orders)+' orders. Every basket was '+PKR(c.aov)+'.',d.MX,d._y);
+  foot(d,'Order station one-pager  ·  '+m.label);
+  d.save('one-pager-'+m.id+'.pdf'); toast('One-pager downloaded.');
+}
+
+/* =====================================================================
+   RENDER + INIT
+   ===================================================================== */
+function render(){
+  refreshStrip();
+  try{
+    ({upload:pageUpload,overview:pageOverview,movers:pageMovers,pizza:pagePizza,menu:pageMenu,
+      trends:pageTrends,coach:pageCoach,kpis:pageKpis,data:pageData,setup:pageSetup})[PAGE]();
+  }catch(e){
+    console.error(e);
+    $('#p-'+PAGE).innerHTML='<div class="warn" style="margin-top:24px"><b>Something went wrong drawing this page.</b><br>'+esc(e.message)+
+      '<br><br>Try removing the month in Files and loading the PDF again.</div>';
+  }
+}
+$('#mSel').onchange=e=>{ APP.cur=e.target.value; APP.cmp=prevMonthId(); render(); };
+$('#cSel').onchange=e=>{ APP.cmp=e.target.value; render(); };
+$$('#basis button').forEach(b=> b.onclick=()=>{ APP.basis=b.dataset.b; render(); });
+$('#burger').onclick=()=>{ $('.rail').classList.toggle('open'); $('#scrim').classList.toggle('open'); };
+$('#scrim').onclick=closeRail;
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeRail(); });
+window.go=go;
+boot();
+</script>
+
+</body>
+</html>
